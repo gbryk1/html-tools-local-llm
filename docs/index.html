@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HTML tools z lokalnym modelem w przeglądarce</title>
+<style>
+  :root { color-scheme: light dark; --accent:#2563eb; --bg:#fff; --fg:#111827; --mut:#6b7280; --card:#f3f4f6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0b0f19; --fg:#e5e7eb; --mut:#9ca3af; --card:#151b28; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width: 800px; margin: 0 auto; padding: 3rem 1.25rem 5rem; }
+  h1 { font-size: 1.9rem; margin-bottom:.25rem; }
+  .note { color: var(--mut); }
+  .tools { display:grid; gap:1rem; grid-template-columns:1fr; margin:2rem 0; }
+  @media (min-width:620px) { .tools { grid-template-columns:1fr 1fr; } }
+  a.tool { display:block; background:var(--card); border-radius:14px; padding:1.25rem; text-decoration:none; color:inherit; border:1px solid transparent; }
+  a.tool:hover { border-color:var(--accent); }
+  a.tool h2 { margin:0 0 .4rem; font-size:1.15rem; }
+  a.tool p { margin:0; color:var(--mut); font-size:.9rem; }
+  code { background:var(--card); padding:.1rem .35rem; border-radius:6px; }
+  footer { margin-top:2.5rem; color:var(--mut); font-size:.85rem; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>🧪 HTML tools z lokalnym modelem</h1>
+  <p class="note">
+    Dwa samodzielne narzędzia HTML w duchu
+    <a href="https://simonwillison.net/2025/Dec/10/html-tools/" target="_blank" rel="noopener">„HTML tools” Simona Willisona</a>:
+    zero backendu, zero build-stepu, modele neuronowe wbudowane w strony jako <strong>base64</strong>
+    i uruchamiane w przeglądarce przez WebAssembly / WebGPU (<code>transformers.js</code>).
+    Dane nie opuszczają urządzenia.
+  </p>
+
+  <div class="tools">
+    <a class="tool" href="speech-to-text.html">
+      <h2>🎙️ Speech-to-Text</h2>
+      <p>Whisper tiny (wielojęzyczny, q8) wbudowany w jeden plik HTML (58 MB).
+         Nagrywaj z mikrofonu lub wgraj plik audio — transkrypcja liczona lokalnie.</p>
+    </a>
+    <a class="tool" href="chat.html">
+      <h2>💬 Chat</h2>
+      <p>SmolLM2-135M-Instruct (q4f16, 117 MB) w plikach base64 obok strony.
+         Prosty czat z modelem językowym działającym w Twojej przeglądarce.</p>
+    </a>
+  </div>
+
+  <p class="note">
+    Dlaczego model czatu nie jest w jednym pliku? GitHub Pages nie pozwala na plik większy niż 100&nbsp;MB,
+    a 117&nbsp;MB wag po zakodowaniu base64 daje ~156&nbsp;MB. Jest więc podzielony na części i sklejany w pamięci.
+    Narzędzie speech-to-text mieści się w jednym pliku.
+  </p>
+
+  <footer>
+    <a href="https://github.com/gbryk1/html-tools-local-llm" target="_blank" rel="noopener">Źródło na GitHubie</a> · zbudowano 2026-09-24 08:11 UTC
+  </footer>
+</main>
+</body>
+</html>
