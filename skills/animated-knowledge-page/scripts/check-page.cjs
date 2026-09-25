@@ -2,6 +2,8 @@
 // Usage: node check-page.cjs <page.html> [outDir=/tmp/shots]
 // Needs playwright-core (OpenClaw bundles one) + a Chromium from ~/.cache/ms-playwright.
 // In a lib-less sandbox export LD_LIBRARY_PATH and FONTCONFIG_FILE first (see SKILL.md step 7 and reference.md §9).
+// On macOS with no downloaded Chromium, point CHROME_PATH at an installed Chrome, e.g.
+// CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome".
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
@@ -62,7 +64,7 @@ async function run(browser, name, opts, shots) {
     const W = document.documentElement.clientWidth;
     return [...document.querySelectorAll('body *')]
       .filter(e => { const r = e.getBoundingClientRect(); return r.width && r.right > W + 1; })
-      .filter(e => !e.closest('.scroll-x'))
+      .filter(e => !e.closest('.scroll-x, pre'))
       .slice(0, 8)
       .map(e => `${e.tagName.toLowerCase()}${e.id ? '#' + e.id : ''}.${[...e.classList].join('.')} right=${Math.round(e.getBoundingClientRect().right)}`);
   });
@@ -75,7 +77,7 @@ async function run(browser, name, opts, shots) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ args: ['--disable-gpu'] });
+  const browser = await chromium.launch({ args: ['--disable-gpu'], executablePath: process.env.CHROME_PATH || undefined });
   await run(browser, 'light', { viewport: { width: 1400, height: 900 }, colorScheme: 'light' }, true);
   await run(browser, 'dark', { viewport: { width: 1400, height: 900 }, colorScheme: 'dark' }, false);
   await run(browser, 'mobile', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, true);

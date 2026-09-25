@@ -15,6 +15,7 @@ Dane użytkownika nigdy nie opuszczają urządzenia.
 | [`docs/chat.html`](docs/chat.html) | `onnx-community/SmolLM2-135M-Instruct-ONNX` (q4f16) | 117 MB → 156 MB base64 | Model podzielony na 3 pliki `.txt` (limit 100 MB/plik na GitHub Pages) |
 | [`docs/cassandra-course.html`](docs/cassandra-course.html) | — (brak modelu ML) | ~160 KB | Animowany kurs wewnętrznej architektury i zasad designu Apache Cassandra w stylu „Head First” (scrollytelling, SVG/Canvas, IntersectionObserver). Źródło: `src/cassandra-course.html`, kopiowane przez `build.py` |
 | [`docs/copilot-pm-course.html`](docs/copilot-pm-course.html) | — (brak modelu ML) | ~95 KB | Animowany przewodnik po Microsoft 365 Copilot i Outlook Copilot dla kierowników projektów w stylu „Head First”: grounding przez Microsoft Graph, uprawnienia, RAID log, nietrywialne scenariusze PM krok po kroku. Źródło: `src/copilot-pm-course.html`, kopiowane przez `build.py` |
+| [`docs/claude-code-course.html`](docs/claude-code-course.html) | — (brak modelu ML) | ~180 KB | Animowany przewodnik (po angielsku) „Claude Code od zera do eksperta” w stylu „Head First”: pętla agenta, okno kontekstu, CLAUDE.md i pamięć, tryby i reguły uprawnień, plan mode, prompting, checkpointy, skille, subagenci, hooki, MCP i pluginy, worktrees i praca równoległa, tryb headless/CI, modele i effort, antywzorce; 16 interaktywnych diagramów, quiz i ściąga. Źródło: `src/claude-code-course.html`, kopiowane przez `build.py` |
 
 ### Jak to działa
 

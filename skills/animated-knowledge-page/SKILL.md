@@ -66,6 +66,8 @@ Code snippets for every step: [reference.md](reference.md). Headless checker: [s
    export LD_LIBRARY_PATH=/tmp/libs/root/usr/lib/x86_64-linux-gnu FONTCONFIG_FILE=/tmp/libs/fonts.conf
    node skills/animated-knowledge-page/scripts/check-page.cjs path/to/page.html /tmp/shots
    ```
+   On macOS without a downloaded Chromium, install `playwright-core` anywhere (`NODE_PATH` to its `node_modules`) and set
+   `CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"`.
    It loads the page via `file://` in light (1400px), dark, mobile (390px) and reduced-motion; scrolls to every
    `figure[id]`; fails on JS errors (`pageerror` + `console.error`), on figures with no DOM mutation / CSS animation / canvas
    pixels after scroll (animation never started), and on horizontal overflow, listing the overflowing elements.
@@ -98,3 +100,7 @@ Code snippets for every step: [reference.md](reference.md). Headless checker: [s
   "failed" to find it. Force the case with a button or seed the first auto-demo.
 - **Dynamic text grammar**: interpolated counts need plural rules (Polish: 1 replika / 2–4 repliki / 5+ replik).
 - **Dynamically created `.reveal` elements** (quiz questions) stay invisible unless passed to `revealIO.observe()`.
+- **Generic class names collide**: a figure's `.sub` card class also matched the cover's `.sub` subtitle and every
+  `.ctx-bar.sub`, fading and dashing both. Prefix per-figure classes (`.subag`) and grep the CSS before adding a short name.
+- **Long `<select>` options overflow at 390px**: give `.ctrl select` `max-width:100%` and `.two > *` `min-width:0`
+  (grid items default to `min-width:auto` and grow to fit `nowrap` content).
