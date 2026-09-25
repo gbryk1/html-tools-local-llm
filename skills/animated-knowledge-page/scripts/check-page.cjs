@@ -1,22 +1,13 @@
 // Headless smoke test for an animated knowledge page.
-// Usage: node check-page.cjs <page.html> [outDir=/tmp/shots]
-// Needs playwright-core (OpenClaw bundles one) + a Chromium from ~/.cache/ms-playwright.
-// In a lib-less sandbox export LD_LIBRARY_PATH and FONTCONFIG_FILE first (see SKILL.md step 7 and reference.md §9).
-// On macOS with no downloaded Chromium, point CHROME_PATH at an installed Chrome, e.g.
-// CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome".
+// Usage: node check-page.cjs <page.html> [outDir=./shots]
+// Browser discovery: see _browser.cjs (CHROME_PATH, Playwright's Chromium, or an installed Chrome).
+// In a lib-less Linux sandbox export LD_LIBRARY_PATH and FONTCONFIG_FILE first (reference.md §9).
 const path = require('path');
 const fs = require('fs');
-const { execSync } = require('child_process');
-
-function loadPlaywright() {
-  try { return require('playwright-core'); } catch {}
-  const root = execSync('npm root -g').toString().trim();
-  return require(path.join(root, 'openclaw/node_modules/playwright-core'));
-}
-const { chromium } = loadPlaywright();
+const { launch } = require('./_browser.cjs');
 
 const file = path.resolve(process.argv[2] || 'index.html');
-const out = process.argv[3] || '/tmp/shots';
+const out = path.resolve(process.argv[3] || 'shots');
 fs.mkdirSync(out, { recursive: true });
 const url = 'file://' + file;
 const WAIT = +process.env.FIG_WAIT_MS || 4000; // longer than the slowest first() delay
@@ -64,7 +55,7 @@ async function run(browser, name, opts, shots) {
     const W = document.documentElement.clientWidth;
     return [...document.querySelectorAll('body *')]
       .filter(e => { const r = e.getBoundingClientRect(); return r.width && r.right > W + 1; })
-      .filter(e => !e.closest('.scroll-x, pre'))
+      .filter(e => !e.closest('.scroll-x, pre'))          // scrollable containers are fine
       .slice(0, 8)
       .map(e => `${e.tagName.toLowerCase()}${e.id ? '#' + e.id : ''}.${[...e.classList].join('.')} right=${Math.round(e.getBoundingClientRect().right)}`);
   });
@@ -72,12 +63,13 @@ async function run(browser, name, opts, shots) {
   console.log(`[${name}] figures=${ids.length} errors=${errs.length} noAnimation=${JSON.stringify(dead)} hOverflow=${sw}px`);
   errs.forEach(e => console.log('   ', e));
   if (sw > 0) overflow.forEach(o => console.log('    overflow:', o));
+  if (sw > 0 && !overflow.length) console.log('    overflow comes from unbreakable text (long URL/identifier), not an element box: add overflow-wrap:break-word');
   if (errs.length || dead.length || sw > 0) failed = true;
   await p.close();
 }
 
 (async () => {
-  const browser = await chromium.launch({ args: ['--disable-gpu'], executablePath: process.env.CHROME_PATH || undefined });
+  const browser = await launch();
   await run(browser, 'light', { viewport: { width: 1400, height: 900 }, colorScheme: 'light' }, true);
   await run(browser, 'dark', { viewport: { width: 1400, height: 900 }, colorScheme: 'dark' }, false);
   await run(browser, 'mobile', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, true);

@@ -1,106 +1,124 @@
 ---
 name: animated-knowledge-page
-description: "Animated course / scrollytelling explainer / interactive knowledge page (\"animowany kurs\", \"strona wiedzy\", Head First style) on one technical topic: builds a single self-contained HTML file with scroll-triggered SVG/Canvas diagrams, Head First boxes, quiz and cheat sheet, verified headless."
+description: "Build an animated course, interactive guide, scrollytelling explainer or 'from zero to expert' knowledge page (\"animowany kurs\", \"strona wiedzy\", \"przewodnik\", Head First style) on one technical topic, tool or product. Produces a single self-contained HTML file with scroll-triggered SVG/HTML/Canvas diagrams, Head First boxes, a quiz and a cheat sheet, fact-checked against current docs and verified headless."
 ---
 
 # Animated Knowledge Page
 
-Builds one self-contained `.html` file that teaches a single technical concept or system (e.g. "how Cassandra works inside")
-through scroll-triggered, clickable diagrams and Head First-style prose. Worked example: `docs/cassandra-course.html`
-(source `src/cassandra-course.html`, ~2400 lines, 14 chapters, 14 interactive figures, no dependencies).
-Code snippets for every step: [reference.md](reference.md). Headless checker: [scripts/check-page.cjs](scripts/check-page.cjs).
+Builds one self-contained `.html` file that teaches a single technical concept, system or tool through
+scroll-triggered, clickable diagrams and Head First-style prose. Examples: "how Cassandra works inside",
+"Claude Code from zero to expert", "Copilot for project managers".
+
+- Starter page with the design system, helpers, scroll machinery, an example figure and the quiz: [templates/shell.html](templates/shell.html)
+- Patterns, box catalogue, figure archetypes, fact-check workflow, browser setup: [reference.md](reference.md)
+- Headless checks: [scripts/check-page.cjs](scripts/check-page.cjs) (smoke test) and [scripts/click-through.cjs](scripts/click-through.cjs) (clicks every control)
 
 ## Hard constraints
 
-- One HTML file: inline `<style>` + inline `<script>`, vanilla JS, SVG and `<canvas>`. No framework, no bundler, no build step.
-- No network dependencies. System font stacks, emoji as icons. Use a CDN only if a library is truly unavoidable, and pin its version.
-- Light and dark via `prefers-color-scheme` on CSS variables; no horizontal page overflow at 390px; `prefers-reduced-motion`
-  makes every animation instant but still shows its end state.
-- Page is readable without JS (`.reveal` only hides when `html.js` is set) and without scrolling animations.
+- One HTML file: inline `<style>` and inline `<script>`, vanilla JS, SVG, HTML and `<canvas>`. No framework, no bundler, no build step.
+- No network dependencies. Use system font stacks and emoji as icons. Use a CDN only if a library is truly unavoidable, and pin its version.
+- Light and dark themes come from `prefers-color-scheme` on CSS variables. There must be no horizontal page overflow at 390px.
+  Under `prefers-reduced-motion`, every animation is instant but still shows its end state.
+- The page is readable without JS (`.reveal` only hides content when `html.js` is set) and without the scroll animations.
+- Be honest. Every figcaption says what the simulation simplifies, and invented numbers are labelled "illustrative" or "heuristic".
 
 ## Steps
 
-1. **Plan the syllabus before writing code.** List 8–15 chapters, each one mechanism, ordered so every chapter only uses
-   earlier ones. For each chapter write: the one-sentence takeaway, the misconception it kills, and the figure that
-   *demonstrates the mechanism itself* (not a decorative picture): what the reader clicks, what moves, what number or state
-   changes, and the reset. Add chapter 0 ("how to read this") and a final chapter (quiz + cheat sheet).
+0. **Decide the frame.** Write the page in the language of the user's request, unless the user or project says
+   otherwise, and write any repo index or README entry in the repo's own language. Decide the audience level and the
+   arc: one mechanism deep, or zero → expert across a whole tool. Find where the page will live: the repo's pages or
+   docs folder, how the index links pages, and whether a generator copies sources. If there is no repo, put the file
+   in the working directory.
+   Done when you know the language, the audience, the target path and the ship steps.
+
+1. **Plan the syllabus before writing code.** List 8–18 chapters. Each chapter covers one mechanism and uses only earlier
+   chapters. For a zero → expert guide, group the chapters into stages: mental model → daily use → extension layer →
+   expert layer. For each chapter write:
+   - the one-sentence takeaway,
+   - the misconception it kills,
+   - the figure that *demonstrates the mechanism itself* (reference §8): what the reader clicks, what moves,
+     what state changes, the "break it" action, and the reset.
+
+   Add chapter 0 ("how to read this", ending in an open 🧠 question that the finale answers) and a final chapter
+   (quiz + cheat sheet). For tool guides, plan an **Option | What | When** table in each chapter that has options.
    Done when every chapter has a takeaway, a figure spec with at least one user action, and at least one box type.
 
-2. **Check the facts that will appear as numbers.** Defaults, thresholds, formulas, version-dependent behavior
-   (e.g. `num_tokens` 256 → 16 in 4.0, `gc_grace_seconds` 864000, QUORUM = ⌊RF/2⌋+1). Say in the figcaption what the
-   simulation simplifies (e.g. "32-bit hash instead of Murmur3 64-bit, geometry is identical").
-   Done when every number in the planned cheat sheet has a source you checked.
+2. **Check the facts** (reference §10). Defaults, thresholds, formulas, flags, file paths, command names and
+   version-dependent *behavior* all need checking. For fast-moving products, download the official docs as markdown
+   into scratch and grep them. Don't trust memory. Record the date you checked, for chapter 0 and the footer.
+   Done when every command, number and behavior in the planned cheat sheet has a source you checked.
 
-3. **Write the shell and design system** (reference §1–3): CSS variables for all colors, dark overrides, `[hidden]{display:none!important}`,
-   reduced-motion block, cover with a big title and a small looping SVG, fixed progress bar, fixed TOC shown only ≥1440px
-   and only after the cover, `main{max-width:800px}` column, `.fig.wide` that bleeds wider on desktop.
-   Done when an empty page with cover, TOC and two dummy chapters renders correctly in light and dark.
+3. **Start from the shell.** Copy `templates/shell.html` to the target path. Fill in `{{…}}`, the TOC, the cover
+   icons and the chapter skeletons. Keep the design tokens and helpers. Add per-figure CSS only in the marked slot,
+   with **prefixed class names**, and grep the CSS before you introduce a short name like `.sub` or `.card`.
+   Done when the page with its cover, TOC and empty chapters renders in light and dark.
 
-4. **Write chapters: prose + boxes.** Conversational second person, short paragraphs, one idea per paragraph, humor that
-   serves the point. Per chapter use 1–3 boxes from the catalogue (reference §3): 🧠 brain teaser, ❓ "no dumb questions"
-   Q/A, ✏️ exercise with `<details>` answer, 🔥 fireside dialogue between two personified concepts, ⚠️ pitfall,
-   🤓 deep-dive, 😌 relax, 📌 bullet summary closing the chapter. Mark text blocks `.reveal`.
-   Done when every chapter ends with a 📌 summary or ✏️ exercise and no chapter is only prose.
+4. **Write chapters: prose + boxes.** Use conversational second person, short paragraphs with one idea each, and humor
+   that serves the point. Each chapter gets 1–3 boxes (reference §3): 🧠, ❓, ✏️, 🔥, ⚠️, 🤓, 🧰, 😌, and a 📌 summary
+   at the end. Show real snippets: config files, commands, frontmatter. Mark text blocks `.reveal`.
+   Done when every chapter ends with a 📌 summary or a ✏️ exercise, and no chapter is only prose.
 
-5. **Build one figure per chapter** (reference §4–7). Structure:
-   - Shared helpers once: `S()/T()/H()` element makers, promise-based `tween()`, `sleep()` that is 0 under reduced
-     motion, `flyDot()` for "a message travels from A to B", colors read from CSS vars into `C`.
-   - One IIFE per figure with local state; register with `registerFig(el, {first, enter, leave})`: `first()` plays an
-     auto-demo once when 25% visible, `enter/leave` start and stop loops (`setInterval`, rAF) so off-screen figures cost nothing.
-   - Write mechanisms as `await` sequences with a `.status` sentence per step narrating what happens and why.
-   - Every figure has buttons (`.btn`, `data-act=…`), at least one "break it" action (kill node, flood partition, delete row)
-     and `↺ Reset`. Serialize clicks through an `enqueue()` promise chain; cancel stale runs with a `runId` counter.
-   - SVG uses `viewBox` + `width:100%`; SVGs that become illegible when narrow go in `.scroll-x` with a `min-width`.
-     Canvas: scale by `devicePixelRatio`, re-layout on `resize` and in `enter()`.
-   - Deterministic inputs (hash of a string) for anything the text refers to; if randomness is part of the lesson,
-     provide a button that forces the interesting case.
-   Done when every figure animates by itself on first view, responds to each button, and resets cleanly.
+5. **Build one figure per chapter** (reference §4–8).
+   - Use one IIFE per figure with local state, registered with `registerFig(el, {first, enter, leave})`. `first()`
+     plays an auto-demo once. `enter/leave` start and stop loops.
+   - Write mechanisms as `await` sequences, with a `.status` sentence for each step saying what happened and why.
+   - Every figure has buttons (`data-act`), at least one "break it" action, and `↺ Reset`. Serialize clicks with
+     `makeQueue()`, and cancel stale runs with a `runId`. Each action starts from a state that matches its narration.
+   - Prefer HTML-grid figures (bars, cards, logs, timelines) when geometry doesn't matter, because they reflow on mobile.
+     SVG uses `viewBox`. Put a wide SVG in `.scroll-x`. Use `wbr()` for CamelCase labels in narrow grids.
+   - Use deterministic data. Add a button for any rare random case the text relies on.
+   - Build large pages in parts: head, CSS, chapter HTML in 2–3 files, and JS. Concatenate them into the target, then
+     extract the `<script>` and run `node --check` before opening a browser.
+   Done when every figure animates on first view, responds to each button, and resets cleanly.
 
-6. **Finish with quiz and cheat sheet.** 8–12 multiple-choice questions generated from an array
-   `[question, options, correctIndex, why]`; one answer per question, reveal right/wrong plus explanation, sticky score pill.
-   Wrong options are the misconceptions from the chapters. Cheat sheet table: parameter | default | what it does.
+6. **Finish with the quiz and cheat sheet.** Write 10–14 questions in the `[question, options, correctIndex, why]`
+   array. The wrong options are the chapters' misconceptions. The cheat sheet has the columns
+   parameter/command | default/what | when. Close the loop in the 🎓 box: answer chapter 0's question and give one next step.
    Done when every chapter is covered by at least one question or cheat-sheet row.
 
-7. **Verify headless** (reference §9 for the sandbox setup):
+7. **Verify headless** (reference §11 for browser setup). Scripts live next to this file. Put screenshots in scratch,
+   not in the repo.
    ```bash
-   export LD_LIBRARY_PATH=/tmp/libs/root/usr/lib/x86_64-linux-gnu FONTCONFIG_FILE=/tmp/libs/fonts.conf
-   node skills/animated-knowledge-page/scripts/check-page.cjs path/to/page.html /tmp/shots
+   node <skill-dir>/scripts/check-page.cjs  path/to/page.html "$SCRATCH/shots"   # light/dark/mobile/reduced
+   node <skill-dir>/scripts/click-through.cjs path/to/page.html "$SCRATCH/shots"  # every button, select, checkbox
    ```
-   On macOS without a downloaded Chromium, install `playwright-core` anywhere (`NODE_PATH` to its `node_modules`) and set
-   `CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"`.
-   It loads the page via `file://` in light (1400px), dark, mobile (390px) and reduced-motion; scrolls to every
-   `figure[id]`; fails on JS errors (`pageerror` + `console.error`), on figures with no DOM mutation / CSS animation / canvas
-   pixels after scroll (animation never started), and on horizontal overflow, listing the overflowing elements.
-   Then **open the screenshots** (`view_image` / Read) and look for overlapping labels, clipped text, unreadable
-   dark-mode contrast. Click through each figure's buttons with a short Playwright script for interactions the auto-demo does not cover.
-   Done when the checker prints `OK` and every figure screenshot was inspected after the last layout change.
+   - `check-page.cjs` fails on JS errors, figures that never animate, and horizontal overflow, and it lists the offenders.
+   - `click-through.cjs` fails on any JS error after clicking every control.
+   - Then **open the screenshots** and look for overlapping labels, clipped text, mid-word breaks, dark-mode
+     contrast problems, and narration that contradicts the visible state. Plan at least two screenshot → fix rounds.
 
-8. **Ship.** If the repo has a generator that wipes the output dir (here `build.py --clean` wipes `docs/`), keep the
-   source outside it (`src/`) and add a copy step. Link the page from the index and README. Commit and push in a
-   command of its own. Done when `git log origin/main -1` shows the commit.
+   Done when both scripts pass and every figure's screenshot was inspected after the last layout change.
 
-## Pitfalls hit while building the Cassandra course
+8. **Ship.** Follow the conventions found in step 0:
+   - Keep the source where the generator won't wipe it, and register it wherever the generator needs it.
+   - If the generator can't run (for example because of missing large inputs), copy the page by hand and patch the
+     generated index the same way as its template.
+   - Link the page from the index and the README.
+   - Commit, and push if that's the repo's workflow. Run the commit or push as a command of its own, never chained after cleanup.
 
-- **Blank screenshots / Chromium crash on `<input>`/`<select>`**: the sandbox had no fonts. Text rendered as nothing and
-  form controls crashed the renderer even with JS disabled. Fix: `fonts-dejavu-core` + `fonts-noto-color-emoji` extracted to
-  `/tmp` with a `FONTCONFIG_FILE` (reference §9). A "no JS errors" run with blank screenshots is not a pass.
-- **Chromium missing shared libraries, OpenClaw `browser` tool refusing `localhost`**: use `playwright-core` bundled with
-  OpenClaw, its downloaded Chromium, libraries extracted with `apt-get download` + `dpkg -x` into `/tmp/libs`, and `file://`
-  URLs (no local server needed). Do not install system packages.
-- **`pkill -f "http.server 8731"` killed its own command** (exit 144): the pattern also matched the shell running it, so
-  the chained `git commit` never ran. Kill by saved PID, or use a bracket pattern (`pkill -f "http.server 873[1]"`), and
-  never chain cleanup with commit/push.
-- **Layout collisions in diagrams only show up in screenshots**: ring labels collided, a label covered a node, the fixed TOC
-  overlapped the cover. Place labels on a larger radius than nodes, reserve space for badges, hide the TOC until
-  past the cover, and plan at least two screenshot→fix rounds.
-- **13px horizontal overflow on mobile**: find the element with the checker's overflow list (elements whose
-  `getBoundingClientRect().right` exceeds the viewport), then wrap it in `.scroll-x` or let it wrap.
-- **`hidden` attribute ignored**: `.ctrl{display:flex}` beats the UA `[hidden]` rule, so toggled controls stayed visible.
-- **Rare random cases look like bugs**: the stale-read demo hits the stale replica ~13% of the time over 5 reads, so tests
-  "failed" to find it. Force the case with a button or seed the first auto-demo.
-- **Dynamic text grammar**: interpolated counts need plural rules (Polish: 1 replika / 2–4 repliki / 5+ replik).
+   Done when the page is reachable from the index and the commit exists (on the remote, if pushed).
+
+## Pitfalls
+
+- **Stale facts about fast-moving tools.** The draft said `acceptEdits` auto-approves only `mkdir/touch/mv/cp`, but the docs
+  said `rm`, `rmdir` and `sed` too. Commands get removed and renamed, and defaults change per model. Grep the docs for every claim.
+- **Blank screenshots / Chromium crashes on `<input>`/`<select>`.** The sandbox had no fonts. A "no JS errors" run with blank
+  screenshots is not a pass (reference §11).
+- **Missing Chromium libraries, or a browser tool refusing `localhost`.** Use `playwright-core` with `file://` URLs. No server is needed.
+- **`pkill -f "http.server 8731"` killed its own command** (exit 144), because the pattern matched its own shell. Kill by PID
+  or use a bracket pattern, and never chain cleanup with commit or push.
+- **Layout collisions only show up in screenshots.** Ring labels collided, a label covered a node, and the fixed TOC
+  overlapped the cover. Put labels on a larger radius than nodes, reserve space for badges, and stack exploded labels
+  in a column rather than scattering them.
+- **Generic class names collide.** A figure's `.sub` class also matched the cover subtitle `.sub` and `.ctx-bar.sub`.
+- **Mobile overflow.** Check the overflow list:
+  - grid items need `min-width:0`,
+  - long `<select>` options need `max-width:100%`,
+  - long unbreakable text in prose needs `overflow-wrap:break-word`. Here the list is empty but `scrollWidth` > 390.
+- **CamelCase labels break mid-word** (`SessionStar|t`) in narrow grids. Insert `<wbr>` between words.
+- **`hidden` attribute ignored.** `.ctrl{display:flex}` beats the UA `[hidden]` rule, so the template forces it.
+- **Narration contradicts state.** A second "break it" action ran on the state the first one left behind. Reset first.
+- **Rare random cases look like bugs.** A 13% event was missed by the tests. Force it with a button or seed the demo.
+- **Dynamic text grammar.** Interpolated counts need plural rules (Polish: 1 replika / 2–4 repliki / 5+ replik).
 - **Dynamically created `.reveal` elements** (quiz questions) stay invisible unless passed to `revealIO.observe()`.
-- **Generic class names collide**: a figure's `.sub` card class also matched the cover's `.sub` subtitle and every
-  `.ctx-bar.sub`, fading and dashing both. Prefix per-figure classes (`.subag`) and grep the CSS before adding a short name.
-- **Long `<select>` options overflow at 390px**: give `.ctrl select` `max-width:100%` and `.two > *` `min-width:0`
-  (grid items default to `min-width:auto` and grow to fit `nowrap` content).
+- **Checker false positives.** `<code>` inside `<pre>` sits past the viewport but scrolls inside its block. The checker ignores `pre` and `.scroll-x`.
