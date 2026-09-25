@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Copilot dla PM-ów — animowany przewodnik w stylu Head First</title>
+<meta name="description" content="Animowany przewodnik po Microsoft 365 Copilot i Outlook Copilot dla kierowników projektów: grounding przez Microsoft Graph, uprawnienia, Outlook, Teams, Excel/Word/PowerPoint, nietrywialne scenariusze PM krok po kroku, pułapki i quiz.">
+<script>document.documentElement.classList.add('js')</script>
+<style>
+:root {
+  color-scheme: light dark;
+  --paper:#fbf8f1; --paper2:#ffffff; --ink:#1c1c22; --mut:#5d5f6b; --line:#d9d3c4; --shadow:#1c1c22;
+  --accent:#1b6fa8; --accent2:#e39b2d; --ok:#2f9e63; --bad:#d64545; --warn:#c98a00;
+  --pen:#b8431f; --note:#fff4c2; --card:#f1ece0; --code:#f3efe6; --dim:#9aa0ab;
+  --hand:"Segoe Print","Bradley Hand","Comic Neue","Comic Sans MS","Chalkboard SE","Marker Felt",cursive;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --serif:Charter,"Bitstream Charter","Iowan Old Style",Georgia,"Palatino Linotype",serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --paper:#15171c; --paper2:#1d2027; --ink:#e7e5df; --mut:#a3a6b1; --line:#383c49; --shadow:#000;
+          --accent:#5aa9e6; --accent2:#f0b34f; --ok:#4cc38a; --bad:#f06b6b; --warn:#f0c040;
+          --pen:#ff9a6b; --note:#3a3420; --card:#232730; --code:#22262e; --dim:#5d6270; }
+}
+* { box-sizing:border-box; }
+[hidden] { display:none !important; }
+html { scroll-behavior:smooth; }
+body { margin:0; background:var(--paper); color:var(--ink); font:18px/1.68 var(--serif); }
+a { color:var(--accent); }
+code, kbd { font:.86em var(--mono); background:var(--code); padding:.08em .35em; border-radius:4px; }
+pre { font:14px/1.5 var(--mono); background:var(--code); border-left:4px solid var(--accent); padding:.9rem 1rem; overflow:auto; border-radius:4px; }
+pre code { background:none; padding:0; font-size:inherit; }
+h1,h2,h3,h4 { font-family:var(--sans); line-height:1.2; }
+h3 { font-size:1.28rem; margin:2.2rem 0 .6rem; }
+strong, b { font-weight:700; }
+.hand { font-family:var(--hand); color:var(--pen); }
+.mut { color:var(--mut); }
+
+/* progress + toc */
+#progress { position:fixed; inset:0 0 auto 0; height:5px; background:linear-gradient(90deg,var(--accent),var(--accent2)); transform-origin:0 50%; transform:scaleX(0); z-index:50; }
+#toc { position:fixed; top:1.4rem; left:1rem; width:205px; font:13.5px/1.35 var(--sans); z-index:40; display:none; opacity:0; pointer-events:none; transition:opacity .4s; }
+body.past-cover #toc { opacity:1; pointer-events:auto; }
+#toc b { display:block; font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--mut); margin-bottom:.5rem; }
+#toc a { display:block; padding:.28rem .55rem; border-left:3px solid var(--line); color:var(--mut); text-decoration:none; }
+#toc a:hover { color:var(--ink); }
+#toc a.active { border-color:var(--accent2); color:var(--ink); font-weight:700; background:var(--card); }
+@media (min-width:1440px) { #toc { display:block; } }
+
+/* cover */
+.cover { min-height:96vh; display:grid; place-items:center; padding:3rem 1.2rem; position:relative; overflow:hidden;
+         background:radial-gradient(circle at 70% 30%, color-mix(in srgb, var(--accent2) 18%, transparent), transparent 55%), var(--paper); }
+.cover-inner { max-width:1040px; width:100%; display:grid; gap:2rem; grid-template-columns:1fr; align-items:center; }
+@media (min-width:900px) { .cover-inner { grid-template-columns:1.1fr .9fr; } }
+.cover .kicker { font:700 .85rem var(--sans); letter-spacing:.2em; text-transform:uppercase; color:var(--accent); }
+.cover h1 { font-size:clamp(2.4rem,5.6vw,4.2rem); margin:.3rem 0 .6rem; letter-spacing:-.02em; }
+.cover h1 span { display:inline-block; background:var(--ink); color:var(--paper); padding:0 .25em; transform:rotate(-1.5deg); }
+.cover .sub { font-size:1.2rem; color:var(--mut); max-width:34em; }
+.cover .stamp { display:inline-block; margin-top:1.2rem; font:700 1rem var(--hand); color:var(--pen); border:3px solid var(--pen); padding:.3rem .8rem; border-radius:8px; transform:rotate(-4deg); }
+.cover svg { width:100%; max-width:400px; justify-self:center; overflow:visible; }
+.spin { animation:spin 50s linear infinite; transform-origin:200px 200px; }
+.spin-rev { animation:spin 34s linear infinite reverse; transform-origin:200px 200px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.cover .scroll-hint { position:absolute; bottom:1.2rem; left:50%; transform:translateX(-50%); font:1rem var(--hand); color:var(--mut); animation:bob 1.8s ease-in-out infinite; }
+@keyframes bob { 50% { transform:translate(-50%,8px); } }
+
+/* layout */
+main { max-width:800px; margin:0 auto; padding:0 1.2rem 6rem; }
+.chapter { padding-top:4.5rem; }
+.chap-head { display:flex; gap:1.1rem; align-items:center; margin-bottom:1rem; }
+.chap-num { flex:none; width:4.2rem; height:4.2rem; border-radius:50%; background:var(--ink); color:var(--paper); display:grid; place-items:center; font:800 1.7rem var(--sans); transform:rotate(-6deg); box-shadow:4px 4px 0 var(--accent2); }
+.chap-head h2 { font-size:clamp(1.6rem,3.8vw,2.2rem); margin:0; }
+.chap-head .tag { font:1.02rem var(--hand); color:var(--pen); display:block; margin-top:.3rem; }
+
+/* reveal */
+.js .reveal { opacity:0; transform:translateY(26px); transition:opacity .7s ease, transform .7s ease; }
+.js .reveal.shown { opacity:1; transform:none; }
+
+/* head-first boxes */
+.box { position:relative; margin:2rem 0; padding:1.1rem 1.25rem 1rem; border:2px solid var(--ink); border-radius:6px; background:var(--paper2); box-shadow:5px 5px 0 var(--shadow); }
+.box > .lbl { position:absolute; top:-1rem; left:1rem; font:800 .82rem var(--sans); letter-spacing:.06em; text-transform:uppercase; background:var(--ink); color:var(--paper); padding:.25rem .65rem; border-radius:4px; transform:rotate(-2deg); }
+.box.brain { border-style:dashed; background:color-mix(in srgb, var(--accent) 8%, var(--paper2)); }
+.box.brain > .lbl { background:var(--accent); color:#fff; }
+.box.pencil { background:color-mix(in srgb, var(--accent2) 10%, var(--paper2)); }
+.box.pencil > .lbl { background:var(--accent2); color:#1c1c22; }
+.box.watch { border-color:var(--bad); box-shadow:5px 5px 0 var(--bad); }
+.box.watch > .lbl { background:var(--bad); color:#fff; }
+.box.geek { background:var(--card); font-size:.95em; }
+.box.geek > .lbl { background:var(--mut); }
+.box.relax { border-color:var(--ok); box-shadow:5px 5px 0 var(--ok); }
+.box.relax > .lbl { background:var(--ok); color:#fff; }
+.box.bullets { background:var(--note); transform:rotate(-.4deg); }
+.box.bullets ul { margin:.3rem 0 0; padding-left:1.2rem; }
+.box.bullets li { margin:.35rem 0; }
+.box.bullets li::marker { content:"▸ "; color:var(--pen); }
+.box.usecase { border-color:var(--accent); box-shadow:5px 5px 0 var(--accent); }
+.box.usecase > .lbl { background:var(--accent); color:#fff; }
+.box.usecase ol { margin:.5rem 0 .3rem; padding-left:1.3rem; }
+.box.usecase li { margin:.4rem 0; }
+.box p:first-of-type { margin-top:.4rem; }
+.box p:last-child { margin-bottom:0; }
+.qa { display:grid; grid-template-columns:auto 1fr; gap:.4rem .8rem; margin:.8rem 0 1rem; }
+.qa .q, .qa .a { font:800 1.15rem var(--sans); }
+.qa .q { color:var(--accent); } .qa .a { color:var(--pen); }
+.qa div { margin:0; }
+details { margin-top:.8rem; }
+summary { cursor:pointer; font:700 .95rem var(--sans); color:var(--pen); }
+.fire { display:grid; gap:.7rem; margin-top:.5rem; }
+.fire .who { font:800 .85rem var(--sans); text-transform:uppercase; letter-spacing:.05em; }
+.fire .line { display:grid; grid-template-columns:7.5rem 1fr; gap:.8rem; }
+.fire .line.l2 .who { color:var(--accent); } .fire .line.l1 .who { color:var(--pen); }
+@media (max-width:560px) { .fire .line { grid-template-columns:1fr; gap:.1rem; } }
+.anno { font:1.05rem/1.35 var(--hand); color:var(--pen); display:block; margin:.4rem 0 .4rem 1.2rem; transform:rotate(-1.2deg); }
+.anno::before { content:"↖ "; }
+.pull { font:italic 1.35rem/1.45 var(--serif); border-left:6px solid var(--accent2); padding:.2rem 0 .2rem 1rem; margin:1.6rem 0; }
+.prompt-ex { font:13.5px/1.5 var(--mono); background:var(--code); border:1.5px dashed var(--line); border-radius:6px; padding:.7rem .85rem; margin-top:.7rem; white-space:pre-wrap; }
+.prompt-ex b { font-family:var(--sans); color:var(--pen); display:block; font-size:11px; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.3rem; }
+
+/* figures (generic) */
+.fig { margin:2.2rem -1rem; padding:1rem 1rem .9rem; background:var(--paper2); border:2px solid var(--ink); border-radius:8px; box-shadow:6px 6px 0 var(--shadow); position:relative; }
+@media (min-width:1000px) { .fig.wide { margin-left:-6rem; margin-right:-6rem; } }
+.fig .ftitle { font:800 .95rem var(--sans); margin:0 0 .6rem; display:flex; gap:.5rem; align-items:baseline; flex-wrap:wrap; }
+.fig .ftitle span { font:400 .85rem var(--sans); color:var(--mut); }
+.fig figcaption, .fig .cap { font:14px/1.45 var(--sans); color:var(--mut); margin-top:.6rem; }
+.fig svg { display:block; width:100%; height:auto; }
+.fig svg text { fill:var(--ink); font-family:var(--sans); }
+.ctrl { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin:.4rem 0 .6rem; font:14px var(--sans); }
+.btn { font:700 13.5px var(--sans); color:var(--ink); background:var(--paper2); border:2px solid var(--ink); border-radius:999px; padding:.33rem .85rem; box-shadow:2px 2px 0 var(--shadow); cursor:pointer; transition:transform .08s; }
+.btn:hover { background:var(--card); }
+.btn:active { transform:translate(2px,2px); box-shadow:none; }
+.btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn.bad { background:var(--bad); border-color:var(--bad); color:#fff; }
+.btn.on { background:var(--ink); color:var(--paper); }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
+.ctrl input[type=text], .ctrl select, .calc input { font:14px var(--mono); padding:.3rem .5rem; border:2px solid var(--ink); border-radius:6px; background:var(--paper); color:var(--ink); }
+.ctrl input[type=text] { width:9rem; }
+.ctrl label { display:inline-flex; gap:.35rem; align-items:center; }
+.scroll-x { overflow-x:auto; }
+.scroll-x > svg { min-width:620px; }
+.two { display:grid; grid-template-columns:1fr; gap:1rem; }
+@media (min-width:720px) { .two { grid-template-columns:1.2fr 1fr; align-items:start; } }
+table.mini { width:100%; border-collapse:collapse; font:13.5px var(--sans); }
+table.mini th, table.mini td { text-align:left; padding:.28rem .4rem; border-bottom:1px solid var(--line); }
+table.mini th { font-size:.75rem; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); }
+table.mini tr.flash td { animation:flashbg 1.2s ease; }
+@keyframes flashbg { 0%{ background:color-mix(in srgb, var(--accent2) 45%, transparent);} 100%{ background:transparent;} }
+.chip { display:inline-block; min-width:1.6em; text-align:center; font:800 12px var(--sans); color:#fff; padding:.1rem .4rem; border-radius:999px; }
+.status { font:14px/1.45 var(--sans); padding:.55rem .75rem; border-radius:6px; background:var(--card); margin-top:.5rem; min-height:2.2rem; }
+.status.ok { background:color-mix(in srgb, var(--ok) 16%, var(--paper2)); }
+.status.bad { background:color-mix(in srgb, var(--bad) 16%, var(--paper2)); }
+.status.warn { background:color-mix(in srgb, var(--warn) 20%, var(--paper2)); }
+.fly { pointer-events:none; }
+.small { font-size:11px; }
+.tiny { font-size:9.5px; }
+.edge { stroke:var(--line); stroke-width:2; }
+.nd circle, .nd rect { fill:var(--paper2); stroke:var(--ink); stroke-width:2.2; transition:fill .3s, opacity .3s; }
+.nd text { font-weight:800; font-size:12px; pointer-events:none; }
+.nd.off circle, .nd.off rect { fill:var(--dim); opacity:.5; stroke-dasharray:4 3; }
+.nd.hot circle, .nd.hot rect { fill:var(--accent2); }
+.nd.pulse circle, .nd.pulse rect, .pop { animation:pulse .6s ease; transform-box:fill-box; transform-origin:center; }
+@keyframes pulse { 40% { transform:scale(1.3); } }
+
+/* ---- chapter 1: grounding / Graph ---- */
+.graph-wrap { display:grid; gap:.6rem; }
+.gtxt { font:12px var(--sans); }
+
+/* ---- chapter 2: permissions ---- */
+.perm-users { display:flex; gap:.6rem; margin-bottom:.6rem; flex-wrap:wrap; }
+.perm-users button { flex:1; min-width:150px; text-align:left; font:13.5px var(--sans); padding:.55rem .7rem; border:2px solid var(--ink); border-radius:8px; background:var(--paper2); cursor:pointer; }
+.perm-users button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+.perm-users button small { display:block; font-weight:400; opacity:.85; }
+
+/* ---- chapter 3: outlook mail stack ---- */
+.mail-stage { display:grid; grid-template-columns:1fr; gap:1rem; }
+@media (min-width:640px) { .mail-stage { grid-template-columns:.85fr 1fr; align-items:start; } }
+.mail-col { display:grid; gap:4px; max-height:280px; overflow-y:auto; padding-right:2px; }
+.mail-chip { font:11.5px var(--sans); background:var(--card); border:1.5px solid var(--line); border-radius:5px; padding:.22rem .4rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity .4s, transform .4s; }
+.mail-out { border:2px solid var(--ink); border-radius:8px; background:var(--paper2); padding:.6rem .7rem; min-height:210px; font:13.5px/1.5 var(--sans); }
+.mail-out h5 { margin:0 0 .4rem; font:800 12px var(--sans); text-transform:uppercase; letter-spacing:.05em; color:var(--mut); }
+.mail-out ul { margin:.2rem 0; padding-left:1.1rem; }
+.mail-out li { opacity:0; transform:translateX(8px); transition:opacity .4s, transform .4s; margin:.3rem 0; }
+.mail-out li.shown { opacity:1; transform:none; }
+.tone-pill { display:inline-block; font:700 11px var(--sans); padding:.12rem .5rem; border-radius:999px; background:var(--card); margin-top:.3rem; }
+
+/* ---- chapter 4: teams pipeline ---- */
+.pipe { display:grid; grid-template-columns:1fr; gap:.7rem; }
+@media (min-width:760px) { .pipe { grid-template-columns:repeat(4,1fr); align-items:start; } }
+.pstage { border:2px dashed var(--line); border-radius:10px; padding:.6rem .55rem; position:relative; min-height:150px; }
+.pstage .pl { position:absolute; top:-.7rem; left:.6rem; background:var(--paper2); padding:0 .35rem; font:800 10.5px var(--sans); letter-spacing:.08em; color:var(--mut); text-transform:uppercase; }
+.pstage .body { font:12px/1.4 var(--sans); margin-top:.5rem; min-height:1rem; }
+.aitem { background:var(--card); border:1.5px solid var(--ink); border-radius:6px; padding:.3rem .4rem; margin:.3rem 0; font:11.5px var(--sans); opacity:0; transform:translateY(6px); transition:opacity .4s, transform .4s; }
+.aitem.shown { opacity:1; transform:none; }
+.aitem.low { border-style:dashed; border-color:var(--warn); }
+.aitem b { display:block; }
+.aitem .meta { color:var(--mut); font-size:10.5px; }
+.pipe-arrow { display:none; align-self:center; text-align:center; font:1.4rem var(--sans); color:var(--pen); }
+@media (min-width:760px) { .pipe-arrow.show { display:block; } }
+
+/* ---- chapter 5: RAID table ---- */
+table.raid { width:100%; border-collapse:collapse; font:12.5px var(--sans); }
+table.raid th, table.raid td { padding:.32rem .4rem; border-bottom:1px solid var(--line); vertical-align:middle; }
+table.raid th { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); text-align:left; }
+table.raid input[type=range] { width:5.4rem; }
+.prio-cell { font:800 12.5px var(--sans); padding:.15rem .5rem; border-radius:999px; text-align:center; display:inline-block; min-width:2.2rem; }
+tr.new-row { animation:pop .4s ease; }
+@keyframes pop { from { transform:scale(.85); opacity:0; } }
+
+/* ---- chapter 6: status aggregation ---- */
+.week-row { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:.6rem; }
+.day { flex:1; min-width:34px; text-align:center; font:10.5px var(--sans); border:1.5px solid var(--line); border-radius:6px; padding:.3rem .1rem; background:var(--paper); transition:background .3s, opacity .3s; }
+.day .ic { font-size:15px; display:block; }
+.day.off { opacity:.25; text-decoration:line-through; }
+.day.hit { background:color-mix(in srgb, var(--accent2) 30%, var(--paper)); }
+.status-doc { border:2px solid var(--ink); border-radius:8px; background:var(--paper2); padding:.7rem .8rem; font:13.5px/1.5 var(--sans); min-height:170px; }
+.status-doc h5 { margin:.6rem 0 .2rem; font:800 12px var(--sans); color:var(--accent); }
+.status-doc h5:first-child { margin-top:0; }
+.status-doc p { margin:.15rem 0; opacity:0; transform:translateY(6px); transition:opacity .4s, transform .4s; }
+.status-doc p.shown { opacity:1; transform:none; }
+.status-doc .gap { color:var(--warn); font-weight:700; }
+
+/* ---- chapter 7: contradiction timeline ---- */
+.tl-svg-wrap .edge.hit { stroke:var(--bad); stroke-width:3; opacity:1; }
+
+/* ---- chapter 8: signals + calc ---- */
+.thread { border:2px solid var(--line); border-radius:8px; padding:.5rem .65rem; margin:.5rem 0; font:13px/1.5 var(--sans); background:var(--paper2); transition:border-color .3s, background .3s; }
+.thread .who { font:800 11.5px var(--sans); color:var(--mut); }
+.thread mark { background:transparent; color:inherit; padding:0 .1em; border-radius:3px; transition:background .4s, color .4s; }
+.thread.flagged { border-color:var(--warn); background:color-mix(in srgb, var(--warn) 12%, var(--paper2)); }
+.thread.flagged mark.hit { background:var(--warn); color:#1c1c22; font-weight:700; }
+.sig-meter { display:flex; align-items:center; gap:.6rem; margin-top:.6rem; }
+.calc { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:.6rem; font:13px var(--sans); margin-top:.6rem; }
+.calc label { display:grid; gap:.2rem; }
+.calc input { width:100%; }
+.impact-out { margin-top:.6rem; }
+
+/* ---- chapter 9: chat bot + sponsor ---- */
+.chat-log { border:2px solid var(--ink); border-radius:8px; background:var(--paper2); padding:.6rem .7rem; min-height:170px; display:flex; flex-direction:column; gap:.5rem; font:13.5px/1.4 var(--sans); }
+.msg { max-width:88%; padding:.4rem .6rem; border-radius:10px; opacity:0; transform:translateY(6px); transition:opacity .35s, transform .35s; }
+.msg.shown { opacity:1; transform:none; }
+.msg.user { align-self:flex-end; background:var(--accent); color:#fff; border-bottom-right-radius:2px; }
+.msg.bot { align-self:flex-start; background:var(--card); border-bottom-left-radius:2px; }
+.msg.bot.deny { border:1.5px dashed var(--warn); }
+.src-chip { display:inline-block; font:10.5px var(--sans); background:var(--paper); border:1px solid var(--line); border-radius:999px; padding:.05rem .45rem; margin-top:.3rem; color:var(--mut); }
+
+/* ---- chapter 10: trust ---- */
+.trust-path { border:2px solid var(--line); border-radius:8px; padding:.6rem .7rem; font:13px/1.5 var(--sans); }
+.trust-path.good { border-color:var(--ok); }
+.trust-path.bad { border-color:var(--bad); }
+.trust-step { opacity:0; transform:translateX(-6px); transition:opacity .4s, transform .4s; margin:.25rem 0; }
+.trust-step.shown { opacity:1; transform:none; }
+
+/* quiz */
+.quiz-q { margin:1.2rem 0; padding:.9rem 1rem; border:2px solid var(--ink); border-radius:8px; background:var(--paper2); }
+.quiz-q h4 { margin:0 0 .6rem; font-size:1rem; }
+.quiz-q .opts { display:grid; gap:.4rem; }
+.quiz-q button { text-align:left; font:14px/1.4 var(--sans); color:var(--ink); background:var(--paper); border:2px solid var(--line); border-radius:6px; padding:.45rem .7rem; cursor:pointer; }
+.quiz-q button:hover:not(:disabled) { border-color:var(--ink); }
+.quiz-q button.right { border-color:var(--ok); background:color-mix(in srgb, var(--ok) 18%, var(--paper2)); }
+.quiz-q button.wrong { border-color:var(--bad); background:color-mix(in srgb, var(--bad) 15%, var(--paper2)); }
+.quiz-q .why { font:14px/1.45 var(--sans); color:var(--mut); margin-top:.5rem; display:none; }
+.quiz-q.done .why { display:block; }
+.score { position:sticky; bottom:1rem; margin-left:auto; width:max-content; font:800 1rem var(--sans); background:var(--ink); color:var(--paper); padding:.45rem .9rem; border-radius:999px; box-shadow:3px 3px 0 var(--accent2); }
+.cheat td:first-child { font-family:var(--mono); font-size:12.5px; white-space:nowrap; }
+footer { max-width:800px; margin:0 auto; padding:2rem 1.2rem 4rem; font:14px var(--sans); color:var(--mut); border-top:2px solid var(--line); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration:.001s !important; animation-iteration-count:1 !important; transition-duration:.001s !important; }
+  html { scroll-behavior:auto; }
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<nav id="toc" aria-label="Spis rozdziałów">
+  <b>Spis treści</b>
+  <a href="#intro">0 · Jak czytać</a>
+  <a href="#graph">1 · Skąd Copilot wie</a>
+  <a href="#perm">2 · Uprawnienia</a>
+  <a href="#outlook">3 · Outlook Copilot</a>
+  <a href="#teams">4 · Teams Copilot</a>
+  <a href="#excel">5 · RAID w Excelu</a>
+  <a href="#status">6 · Status z 7 dni</a>
+  <a href="#hard">7 · Trudna rozmowa</a>
+  <a href="#signals">8 · Ukryte opóźnienia</a>
+  <a href="#agent">9 · Agent i prezentacja</a>
+  <a href="#pitfalls">10 · Pułapki</a>
+  <a href="#final">11 · Egzamin + ściąga</a>
+</nav>
+
+<header class="cover">
+  <div class="cover-inner">
+    <div>
+      <div class="kicker">Animowany przewodnik · Microsoft 365 Copilot dla PM-ów</div>
+      <h1>Copilot <span>od kuchni</span></h1>
+      <p class="sub">Jak asystent AI w Outlooku, Teams, Excelu i Wordzie naprawdę czyta Twoją skrzynkę, dlaczego nie widzi
+        więcej niż Ty, i jak zamienić 30 maili tygodniowo w gotowy status projektu. Przewijaj — diagramy same ruszą.</p>
+      <div class="stamp">Twój mózg na Copilocie 🧠</div>
+    </div>
+    <svg viewBox="0 0 400 400" aria-hidden="true">
+      <g class="spin">
+        <circle cx="200" cy="200" r="150" fill="none" stroke="var(--line)" stroke-width="4"/>
+        <g id="cover-nodes"></g>
+      </g>
+      <g class="spin-rev">
+        <circle cx="200" cy="200" r="95" fill="none" stroke="var(--accent2)" stroke-width="2" stroke-dasharray="4 10"/>
+      </g>
+      <path d="M200 150 L222 195 L270 202 L235 235 L244 283 L200 260 L156 283 L165 235 L130 202 L178 195 Z"
+            fill="var(--accent)" stroke="var(--ink)" stroke-width="4" stroke-linejoin="round"/>
+      <circle cx="200" cy="212" r="8" fill="#fff"/>
+    </svg>
+  </div>
+  <div class="scroll-hint">przewijaj ↓</div>
+</header>
+
+<main>
+
+<!-- ============================ 0 ============================ -->
+<section class="chapter" id="intro">
+  <div class="chap-head reveal"><div class="chap-num">0</div><div><h2>Jak czytać ten przewodnik</h2><span class="tag">…czyli dlaczego tu są obrazki, żarty i suwaki</span></div></div>
+
+  <p class="reveal">Ten przewodnik nie jest listą funkcji Copilota — takich list jest pełno w dokumentacji Microsoftu.
+  Jest o <em>mechanizmach</em>: skąd Copilot bierze fakty, dlaczego czasem odmawia odpowiedzi, i jak z tego zrobić
+  narzędzie, które realnie odciąża kierownika projektu, zamiast generować ładnie brzmiące, ale zmyślone liczby.
+  Po lekturze powinieneś umieć wytłumaczyć koledze z zespołu, <em>dlaczego</em> Copilot zachowuje się tak, jak się zachowuje —
+  nie tylko <em>że</em> tak robi.</p>
+
+  <div class="box brain reveal"><span class="lbl">🧠 Mózg na wysokich obrotach</span>
+    <p>Zanim zaczniesz: jak zaprojektowałbyś asystenta AI, który ma dostęp do <b>firmowej</b> poczty, plików i spotkań,
+    ale nie może pokazać jednemu pracownikowi danych innego? Zapisz swoją odpowiedź (choćby w głowie) i porównaj ją
+    z rozdziałem 2.</p>
+  </div>
+
+  <p class="reveal">Każdy diagram ze znaczkiem <b>▶</b> startuje sam, gdy wjedzie na ekran, ale możesz go też klikać,
+  psuć i resetować. Najwięcej nauczysz się <em>psując</em>: pytaj o coś, do czego nie masz dostępu, wyłączaj grounding,
+  wrzucaj bełkotliwą transkrypcję — i patrz, co Copilot z tym zrobi.</p>
+
+  <div class="box geek reveal"><span class="lbl">🤓 Zakres tego przewodnika</span>
+    <p>Mowa o <b>Microsoft 365 Copilot</b> (licencja per użytkownik, działa w Outlooku, Teams, Wordzie, Excelu i PowerPoincie),
+    <b>Business Chat / Copilot Chat</b> (widok „ponad aplikacjami”, łączy wiele źródeł naraz) oraz <b>Copilot Studio</b>
+    (budowanie własnych agentów). Nazwy funkcji i przyciski w interfejsie zmieniają się między aktualizacjami Microsoftu
+    szybciej niż ten dokument — mechanizmy pod spodem (grounding, uprawnienia, cytowania źródeł) są stabilniejsze i to na nich
+    się skupiamy.</p>
+  </div>
+</section>
+
+<!-- ============================ 1 ============================ -->
+<section class="chapter" id="graph">
+  <div class="chap-head reveal"><div class="chap-num">1</div><div><h2>Skąd Copilot to wie?</h2><span class="tag">grounding: LLM, który najpierw odrabia pracę domową</span></div></div>
+
+  <p class="reveal">Duży model językowy sam z siebie zna tylko to, czego nauczył się z ogólnodostępnego internetu do pewnej
+  daty — nic o Twoim projekcie, budżecie ani wczorajszym spotkaniu. Gdyby Copilot odpowiadał wyłącznie z tej wiedzy,
+  na pytanie „jaki jest status projektu Feniks?” zgadywałby albo grzecznie zmyślał coś prawdopodobnie brzmiącego.
+  Microsoft nazywa rozwiązanie tego problemu <b>groundingiem</b>: zanim model językowy w ogóle zacznie pisać odpowiedź,
+  Copilot najpierw <em>szuka</em>.</p>
+
+  <p class="reveal">Silnikiem tego wyszukiwania jest <b>Microsoft Graph</b> — jeden interfejs do całej Twojej organizacji:
+  maili w Exchange, plików w SharePoint/OneDrive, czatów i spotkań w Teams, zadań w Plannerze. Zapytanie leci więc
+  dwuetapowo: najpierw <b>wyszukiwanie semantyczne</b> po tych źródłach (nie tylko dopasowanie słów — Graph rozumie, że
+  „ryzyka” i „RAID log” to pokrewne pojęcia), potem znalezione fragmenty trafiają jako <b>kontekst</b> do promptu, który
+  dopiero wtedy widzi model językowy. Odpowiedź, którą dostajesz, to model piszący <em>na podstawie</em> tych fragmentów —
+  z cytowaniami źródeł, żebyś mógł sprawdzić, skąd wzięła się każda liczba.</p>
+
+  <figure class="fig wide" id="fig-graph">
+    <div class="ftitle">▶ Ścieżka zapytania przez Microsoft Graph <span>wybierz pytanie i patrz, które źródła się zapalają</span></div>
+    <div class="ctrl">
+      <button class="btn primary" data-q="0">„Jaki jest status projektu Feniks?”</button>
+      <button class="btn primary" data-q="1">„Kto ma dosłać makietę do piątku?”</button>
+      <label style="margin-left:auto"><input type="checkbox" id="graph-toggle" checked> dostęp do Grafu włączony</label>
+    </div>
+    <div class="scroll-x"><svg viewBox="0 0 760 300"></svg></div>
+    <div class="status" id="graph-status">Wybierz pytanie, żeby zobaczyć przepływ.</div>
+    <figcaption>Uproszczenie: w rzeczywistości ranking wyników Graphu uwzględnia też m.in. bliskość organizacyjną
+      i świeżość, a nie tylko dopasowanie tematu.</figcaption>
+  </figure>
+
+  <div class="box nodumb reveal"><span class="lbl">❓ Nie istnieją głupie pytania</span>
+    <div class="qa">
+      <div class="q">P:</div><div>Czy to znaczy, że Copilot „uczy się” na moich mailach, tak jak model uczył się na internecie?</div>
+      <div class="a">O:</div><div><b>Nie.</b> Grounding to wyszukiwanie w czasie zapytania, nie trenowanie modelu.
+      Fragmenty Twojej poczty trafiają do promptu tylko na czas jednej odpowiedzi i nie stają się częścią wag modelu,
+      z których korzystają inni użytkownicy.</div>
+      <div class="q">P:</div><div>Czemu czasem Copilot mówi „nie znalazłem nic na ten temat”, chociaż wiem, że mail istnieje?</div>
+      <div class="a">O:</div><div>Bo wyszukiwanie ma próg trafności — zbyt ogólne pytanie albo mail sprzed dawna
+      z inną terminologią może nie przekroczyć progu. Rozdział 10 pokazuje, jak formułować pytania, żeby to ograniczyć.</div>
+    </div>
+  </div>
+
+  <div class="box bullets reveal"><span class="lbl">📌 Celne spostrzeżenia</span>
+    <ul>
+      <li>Grounding = wyszukiwanie w Microsoft Graph <b>przed</b> tym, jak model napisze choć jedno słowo odpowiedzi.</li>
+      <li>Cztery główne źródła: poczta, pliki (SharePoint/OneDrive), spotkania/transkrypcje i czaty Teams.</li>
+      <li>Odpowiedź z groundingiem ma <b>cytowania</b> — kliknij je, zanim uwierzysz w liczbę.</li>
+      <li>Bez dostępu do Grafu (albo gdy nic nie znaleziono) model odpowiada z ogólnej wiedzy — i to jest moment,
+      w którym ryzyko zmyślenia rośnie najbardziej.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ 2 ============================ -->
+<section class="chapter" id="perm">
+  <div class="chap-head reveal"><div class="chap-num">2</div><div><h2>Uprawnienia: Copilot nie wie nic więcej niż Ty</h2><span class="tag">jedna zasada, która rozwiązuje najczęstszy strach działów bezpieczeństwa</span></div></div>
+
+  <p class="reveal">Najważniejsza zasada bezpieczeństwa Copilota brzmi zaskakująco prosto: <b>Copilot pokazuje wyłącznie
+  to, do czego osoba pytająca i tak już ma dostęp</b> — ani grama więcej. Nie ma żadnego „konta serwisowego Copilota”
+  z podglądem do wszystkiego. Kiedy zadajesz pytanie, wyszukiwanie w Graphie działa <em>w Twoim imieniu</em> i respektuje
+  te same uprawnienia SharePoint, te same grupy dystrybucyjne i te same reguły „udostępnij tylko tym osobom”, które
+  obowiązywałyby, gdybyś ręcznie szukał w Outlooku czy w SharePoincie.</p>
+
+  <figure class="fig wide" id="fig-perm">
+    <div class="ftitle">▶ To samo pytanie, dwoje różnych ludzi <span>przełącz osobę i zadaj to samo pytanie o budżet</span></div>
+    <div class="perm-users">
+      <button class="btn on" data-user="ala">👩‍💼 Ala, Project Manager<small>ma dostęp do folderu „Budżet”</small></button>
+      <button class="btn" data-user="bartek">🧑‍💻 Bartek, kontraktor<small>brak dostępu do folderu „Budżet”</small></button>
+    </div>
+    <div class="ctrl"><button class="btn primary" data-act="ask">💬 Zapytaj: „Jaki jest aktualny budżet projektu?”</button></div>
+    <div class="two">
+      <svg viewBox="0 0 420 270"></svg>
+      <div class="status" id="perm-status">Wybierz osobę i zadaj pytanie.</div>
+    </div>
+  </figure>
+
+  <div class="box fireside reveal"><span class="lbl">🔥 Pogawędka przy kominku</span>
+    <p class="mut" style="margin-top:.4rem">Dzisiejsi goście: <b>Model Językowy</b> i <b>Kontroler Uprawnień</b>.</p>
+    <div class="fire">
+      <div class="line l1"><div class="who">Model Językowy</div><div>Widzę w indeksie super szczegółowy arkusz „Wynagrodzenia zespołu”. Mogę o nim wspomnieć?</div></div>
+      <div class="line l2"><div class="who">Kontroler Uprawnień</div><div>Sprawdzam listę ACL tego pliku… Kto pyta?</div></div>
+      <div class="line l1"><div class="who">Model Językowy</div><div>Nowy kontraktor, dopiero dołączył do projektu.</div></div>
+      <div class="line l2"><div class="who">Kontroler Uprawnień</div><div>Nie ma go na liście. Ten plik nie istnieje dla tego zapytania — nawet nie mów, że go widziałeś, żeby nie zdradzić samego faktu jego istnienia.</div></div>
+      <div class="line l1"><div class="who">Model Językowy</div><div>A gdybym miał świetny pomysł, jak podsumować budżet z pamięci, bo widziałem go przy innym pytaniu wcześniej dziś?</div></div>
+      <div class="line l2"><div class="who">Kontroler Uprawnień</div><div>Sprawdzam uprawnienia przy <b>każdym</b> zapytaniu, nie raz na sesję. Nic nie zostaje „zapamiętane” obok reguł dostępu.</div></div>
+    </div>
+  </div>
+
+  <div class="box watch reveal"><span class="lbl">⚠️ Uwaga, pułapka</span>
+    <p>To działa w obie strony: jeśli w Twojej organizacji uprawnienia do SharePointa są bałaganiarskie (za szerokie grupy,
+    „Wszyscy pracownicy” z dostępem do wrażliwego folderu), Copilot <b>ujawni ten bałagan szybciej</b>, niż ktokolwiek
+    ręcznie przeklikujący foldery. Wdrożenie Copilota to dobry moment na audyt uprawnień, nie powód, żeby się go bać.</p>
+  </div>
+</section>
+
+<!-- ============================ 3 ============================ -->
+<section class="chapter" id="outlook">
+  <div class="chap-head reveal"><div class="chap-num">3</div><div><h2>Outlook Copilot</h2><span class="tag">30 maili wchodzi, 4 punkty wychodzą</span></div></div>
+
+  <p class="reveal">W samym Outlooku Copilot robi cztery rzeczy, z których PM korzysta najczęściej. <b>Podsumowanie wątku</b>
+  bierze cały, rozgałęziony wątek mailowy i redukuje go do kilku zdań z decyzjami i otwartymi pytaniami. <b>Draft</b>
+  pisze szkic odpowiedzi na podstawie krótkiej instrukcji („odmów uprzejmie, zaproponuj termin za dwa tygodnie”).
+  <b>Coach by Copilot</b> nie pisze za Ciebie — czyta Twój <em>własny</em> szkic i ocenia ton, jasność i to, czy trafi
+  do odbiorcy (za ostro? za mgliście? brakuje konkretnego pytania?). A <b>meeting prep</b> przed spotkaniem zbiera
+  powiązane maile, pliki i poprzednie notatki, żebyś nie wchodził na rozmowę bez kontekstu.</p>
+
+  <figure class="fig wide" id="fig-outlook">
+    <div class="ftitle">▶ Wątek „Re: Re: Re: Zakres fazy 2” — 27 maili <span>kliknij, co ma zrobić Copilot</span></div>
+    <div class="ctrl">
+      <button class="btn primary" data-act="summarize">📋 Podsumuj wątek</button>
+      <button class="btn primary" data-act="draft">✍️ Draft: „zaproponuj przesunięcie o tydzień”</button>
+      <button class="btn primary" data-act="coach">🎯 Coach: oceń mój szkic</button>
+      <button class="btn" data-act="reset">↺ Reset</button>
+    </div>
+    <div class="mail-stage">
+      <div class="mail-col" id="mail-col"></div>
+      <div class="mail-out" id="mail-out"><h5>Wynik</h5><p class="mut small">Wybierz akcję powyżej.</p></div>
+    </div>
+    <figcaption>Liczba maili i treść są tu spreparowane dla przykładu — mechanizm (redukcja długiego wątku do kilku
+    zdań z cytowaniami) jest ten sam co w prawdziwym Outlooku.</figcaption>
+  </figure>
+
+  <div class="box pencil reveal"><span class="lbl">✏️ Zaostrz ołówek</span>
+    <p>Masz napisać do sponsora projektu maila z prośbą o dodatkowy budżet. Który prompt do Coach by Copilot da Ci
+    bardziej użyteczną informację zwrotną: <b>(a)</b> „popraw ten mail” czy <b>(b)</b> „oceń, czy ten mail brzmi na
+    pewnego siebie, czy przeprasza za coś, za co nie musi przepraszać, i czy jasno mówi, o ile więcej pieniędzy proszę”?</p>
+    <details><summary>Odpowiedź</summary><p><b>(b)</b>. Coach ocenia to, o co go poprosisz — im konkretniejsze kryterium
+    (ton, jasność ceny, brak nadmiernych przeprosin), tym bardziej użyteczna odpowiedź, zamiast ogólnikowego
+    „brzmi dobrze, może drobne poprawki stylistyczne”.</p></details>
+  </div>
+</section>
+
+<!-- ============================ 4 ============================ -->
+<section class="chapter" id="teams">
+  <div class="chap-head reveal"><div class="chap-num">4</div><div><h2>Copilot w Teams</h2><span class="tag">od gadaniny na spotkaniu do zadania z terminem</span></div></div>
+
+  <p class="reveal">Jeśli spotkanie ma włączoną transkrypcję, Copilot w Teams widzi ją na żywo i po spotkaniu. Najbardziej
+  przydatna dla PM-a sztuczka to <b>ekstrakcja action items</b>: Copilot czyta transkrypcję, wyłapuje zdania, które brzmią
+  jak zobowiązanie („zrobię to do piątku”, „ja się tym zajmę”), i buduje z nich listę zadań z sugerowanym właścicielem
+  (kto to powiedział albo do kogo się zwrócono) i terminem, jeśli padł w rozmowie. To wciąż tylko <em>sugestia</em> —
+  PM potwierdza, zanim zadanie wyląduje w Plannerze czy w mailu z podsumowaniem.</p>
+
+  <figure class="fig wide" id="fig-teams">
+    <div class="ftitle">▶ Od rozmowy do zadania <span>uruchom pipeline, potem spróbuj zaszumić transkrypcję</span></div>
+    <div class="ctrl">
+      <button class="btn primary" data-act="run">▶ Uruchom na transkrypcji</button>
+      <button class="btn bad" data-act="noise">🗣️ Dodaj przegadanych na raz 3 osoby</button>
+      <button class="btn" data-act="reset">↺ Reset</button>
+    </div>
+    <div class="pipe">
+      <div class="pstage" id="p-trans"><span class="pl">1 · Transkrypcja</span><div class="body"></div></div>
+      <div class="pipe-arrow show">→</div>
+      <div class="pstage" id="p-extract"><span class="pl">2 · Ekstrakcja</span><div class="body"></div></div>
+      <div class="pipe-arrow show">→</div>
+      <div class="pstage" id="p-assign"><span class="pl">3 · Właściciel + termin</span><div class="body"></div></div>
+    </div>
+    <div class="status" id="teams-status">Kliknij „Uruchom”, żeby zobaczyć pipeline w akcji.</div>
+    <figcaption>W realnym Teams ekstrakcja korzysta też z tożsamości mówiących (kto konkretnie mówił) — tu upraszczamy
+    do etykiet ról.</figcaption>
+  </figure>
+
+  <div class="box usecase reveal"><span class="lbl">💼 Nietrywialny use case: action items → follow-up mailem</span>
+    <p><b>Problem:</b> po każdym spotkaniu statusowym ktoś musi ręcznie przepisać ustalenia do maila z podsumowaniem
+    i przypilnować, żeby wysłać go tego samego dnia — inaczej ustalenia „rozmywają się” do następnego tygodnia.</p>
+    <ol>
+      <li>Po spotkaniu w Teams otwórz zakładkę „Podsumowanie Copilota” i sprawdź wygenerowaną listę action items.</li>
+      <li>Popraw ręcznie te oznaczone jako niepewne (patrz figura wyżej — przegadane fragmenty).</li>
+      <li>W Outlooku poproś Draft with Copilot: „napisz maila do uczestników spotkania [nazwa] z listą ustaleń poniżej,
+      pogrupuj wg właściciela, dodaj termin przy każdym punkcie”.</li>
+      <li>Wklej potwierdzoną listę action items jako kontekst dla draftu.</li>
+      <li>Uruchom Coach by Copilot z kryterium: „czy każdy punkt ma jasny termin i jedną osobę odpowiedzialną?”.</li>
+      <li>Wyślij — najlepiej tego samego dnia, gdy pamięć uczestników o ustaleniach jest jeszcze świeża.</li>
+    </ol>
+    <div class="prompt-ex"><b>przykładowy prompt (Teams)</b>Podsumuj to spotkanie: kluczowe decyzje, action items z właścicielem i terminem, oraz otwarte pytania bez odpowiedzi. Oznacz elementy, co do których nie jesteś pewien.</div>
+  </div>
+</section>
+
+<!-- ============================ 5 ============================ -->
+<section class="chapter" id="excel">
+  <div class="chap-head reveal"><div class="chap-num">5</div><div><h2>Excel, Word i PowerPoint dla PM-a</h2><span class="tag">RAID log, który sam liczy priorytety</span></div></div>
+
+  <p class="reveal">Excel Copilot potrafi tłumaczyć zwykły język na formuły i podsumowania, ale najbardziej praktyczne
+  zastosowanie dla PM-a to <b>RAID log</b> (Risks, Assumptions, Issues, Dependencies) z automatycznie liczonym priorytetem.
+  Klasyczny wzór: <b>Priorytet = Wpływ × Prawdopodobieństwo</b> (oba w skali 1–5), co daje zakres 1–25 i pozwala
+  posortować ryzyka bez zgadywania „na oko”, co jest ważniejsze.</p>
+
+  <figure class="fig wide" id="fig-raid">
+    <div class="ftitle">▶ RAID log na żywo <span>przesuń suwaki albo dodaj wiersz z notatki spotkania</span></div>
+    <div class="ctrl">
+      <button class="btn primary" data-act="add">📝 Dodaj ryzyko z notatki spotkania</button>
+      <button class="btn" data-act="reset">↺ Reset</button>
+    </div>
+    <div class="scroll-x">
+      <table class="raid">
+        <thead><tr><th>Ryzyko</th><th>Właściciel</th><th>Wpływ</th><th>Prawdop.</th><th>Priorytet</th><th>Status</th></tr></thead>
+        <tbody id="raid-body"></tbody>
+      </table>
+    </div>
+    <div class="status" id="raid-status">Priorytet = Wpływ × Prawdopodobieństwo. Kolor rośnie wraz z pilnością.</div>
+    <figcaption>Wzór Wpływ × Prawdopodobieństwo to jedna z popularnych konwencji PMI — Twoja organizacja może używać
+    innej skali; mechanizm liczenia i sortowania zostaje ten sam.</figcaption>
+  </figure>
+
+  <div class="box usecase reveal"><span class="lbl">💼 Nietrywialny use case: RAID log budowany automatycznie</span>
+    <p><b>Problem:</b> ryzyka wspominane mimochodem na spotkaniach nigdy nie trafiają do formalnego rejestru, bo nikt
+    nie ma czasu ich tam ręcznie przepisywać — aż do dnia, gdy się materializują.</p>
+    <ol>
+      <li>Po spotkaniu w Teams poproś Copilota o listę wzmianek, które brzmią jak ryzyko lub założenie.</li>
+      <li>Skopiuj wynik do Excela, do arkusza z kolumnami Właściciel / Wpływ / Prawdopodobieństwo / Status.</li>
+      <li>Poproś Copilota w Excelu o formułę priorytetu w nowej kolumnie: <code>=Wpływ*Prawdopodobieństwo</code>
+      z formatowaniem warunkowym (zielony–żółty–czerwony).</li>
+      <li>Uzupełnij wpływ i prawdopodobieństwo ręcznie — to jedyna ocena, której Copilot <em>nie</em> powinien
+      zgadywać za Ciebie (patrz rozdział 10, pułapka „halucynowane liczby”).</li>
+      <li>Poproś o posortowanie malejąco wg priorytetu i podświetlenie wierszy powyżej progu (np. 15).</li>
+      <li>Raz w tygodniu poproś o krótkie podsumowanie zmian w RAID logu od ostatniej wersji pliku.</li>
+    </ol>
+    <div class="prompt-ex"><b>przykładowy prompt (Excel)</b>Dodaj kolumnę "Priorytet" = Wpływ * Prawdopodobieństwo, posortuj arkusz malejąco po tej kolumnie i pokoloruj wiersze: czerwony gdy priorytet >= 15, żółty gdy 8-14, zielony poniżej.</div>
+  </div>
+</section>
+
+<!-- ============================ 6 ============================ -->
+<section class="chapter" id="status">
+  <div class="chap-head reveal"><div class="chap-num">6</div><div><h2>Nietrywialny scenariusz: cotygodniowy status z wielu źródeł</h2><span class="tag">jedno pytanie do Business Chat zamiast godziny scrollowania</span></div></div>
+
+  <p class="reveal">To jest chyba najczęstsza „zabójcza aplikacja” Copilota dla PM-ów: cotygodniowy status projektu,
+  który normalnie wymaga przekopania się przez maile, pliki i notatki ze spotkań z całego tygodnia. Business Chat
+  (widok Copilota „ponad aplikacjami”, dostępny też jako Copilot Chat) potrafi w jednym zapytaniu zebrać wszystkie
+  te źródła naraz i złożyć z nich szkic dokumentu w Wordzie.</p>
+
+  <figure class="fig wide" id="fig-status">
+    <div class="ftitle">▶ 7 dni źródeł → jeden status <span>kliknij dzień, żeby symulować brak dostępu do niego</span></div>
+    <div class="ctrl">
+      <button class="btn primary" data-act="build">🏗️ Zbuduj status z tego tygodnia</button>
+      <button class="btn" data-act="reset">↺ Reset</button>
+    </div>
+    <div class="week-row" id="week-row"></div>
+    <div class="two">
+      <div class="status" id="status-log">Kliknij dzień, żeby wykluczyć go z zakresu (np. urlop), albo od razu zbuduj status.</div>
+      <div class="status-doc" id="status-doc"></div>
+    </div>
+    <figcaption>Prawdziwy Business Chat nie pyta o zgodę na każdy dzień z osobna — tu robimy to widoczne, żeby pokazać,
+    że luka w źródłach = luka w statusie, nie zmyślony wypełniacz.</figcaption>
+  </figure>
+
+  <div class="box usecase reveal"><span class="lbl">💼 Krok po kroku</span>
+    <ol>
+      <li>Otwórz Copilot Chat i zapytaj: „zbierz wszystko, co dotyczy projektu Feniks z ostatnich 7 dni: maile, pliki,
+      spotkania”.</li>
+      <li>Poproś o strukturę: „highlights / ryzyka / następne kroki”, żeby wynik pasował do szablonu statusu
+      Twojej organizacji.</li>
+      <li>Sprawdź cytowania — kliknij dwa-trzy, żeby zweryfikować, że kontekst faktycznie mówi to, co sugeruje zdanie.</li>
+      <li>Poproś: „przenieś to do dokumentu Word w formacie naszego cotygodniowego statusu” (jeśli masz wzór, dołącz go
+      jako plik referencyjny).</li>
+      <li>Ręcznie dopisz rzeczy, o których wiesz, a które nie zostały nigdzie napisane (rozmowy przy kawie się nie liczą).</li>
+      <li>Wyślij do zespołu i sponsora — i zapamiętaj użyty prompt jako szablon na przyszły tydzień.</li>
+    </ol>
+    <div class="prompt-ex"><b>przykładowy prompt (Business Chat)</b>Zbierz informacje o projekcie Feniks z ostatnich 7 dni z mojej poczty, plików w SharePoincie i spotkań w Teams. Zbuduj status w trzech sekcjach: Highlights, Ryzyka, Następne kroki. Podaj źródło przy każdym punkcie.</div>
+  </div>
+
+  <div class="box watch reveal"><span class="lbl">⚠️ Uwaga, pułapka</span>
+    <p>Jeśli byłeś na urlopie i nie masz maili z tego okresu we własnej skrzynce, status <em>nie</em> będzie zawierał
+    tego, co działo się bez Ciebie w wątkach, do których nie byłeś dołączony (Copilot działa w Twoich uprawnieniach —
+    rozdział 2). Brak wzmianki o czymś w statusie ≠ „nic się nie działo”.</p>
+  </div>
+</section>
+
+<!-- ============================ 7 ============================ -->
+<section class="chapter" id="hard">
+  <div class="chap-head reveal"><div class="chap-num">7</div><div><h2>Nietrywialny scenariusz: trudna rozmowa z interesariuszem</h2><span class="tag">zanim wejdziesz na tę rozmowę, sprawdź, czy ktoś się nie zaplątał w obietnice</span></div></div>
+
+  <p class="reveal">Najbardziej stresujące rozmowy PM-a to te, w których interesariusz twierdzi „przecież ustaliliśmy
+  inny termin” — a Ty nie pamiętasz dokładnie, kto co obiecał, w którym mailu. Copilot może przed taką rozmową
+  przeszukać całą historię komunikacji z daną osobą i wyłapać miejsca, w których różne wiadomości mówią sprzeczne rzeczy.</p>
+
+  <figure class="fig wide" id="fig-hard">
+    <div class="ftitle">▶ Historia komunikacji z interesariuszem <span>uruchom wykrywanie sprzeczności</span></div>
+    <div class="ctrl">
+      <button class="btn primary" data-act="scan">🔍 Znajdź sprzeczności</button>
+      <button class="btn" data-act="reset">↺ Reset</button>
+    </div>
+    <div class="scroll-x tl-svg-wrap"><svg viewBox="0 0 770 220"></svg></div>
+    <div class="status" id="hard-status">7 wiadomości z ostatnich 6 tygodni. Kliknij „Znajdź sprzeczności”.</div>
+  </figure>
+
+  <div class="box usecase reveal"><span class="lbl">💼 Krok po kroku</span>
+    <ol>
+      <li>Przed spotkaniem zapytaj: „pokaż całą historię komunikacji z [imię interesariusza] o terminie dostawy fazy 2”.</li>
+      <li>Poproś wprost: „czy w tej historii są sprzeczne ustalenia? Wypisz je z datami i cytatami”.</li>
+      <li>Dla każdej znalezionej sprzeczności sprawdź źródłowy mail — Copilot pokazuje różnicę, ale to Ty oceniasz
+      kontekst (może druga wiadomość świadomie zmieniała wcześniejsze ustalenie).</li>
+      <li>Poproś o chronologiczną, jednostronicową „mapę ustaleń”, żeby mieć ją pod ręką na spotkaniu.</li>
+      <li>Wejdź na rozmowę uzbrojony w konkretne daty i cytaty, nie w pamięć.</li>
+      <li>Po spotkaniu poproś Draft with Copilot o mail podsumowujący nowe, jednoznaczne ustalenie — żeby nie było
+      trzeciej wersji za miesiąc.</li>
+    </ol>
+    <div class="prompt-ex"><b>przykładowy prompt (Copilot Chat)</b>Przeszukaj moją komunikację z Anną Kowalską o terminie dostawy fazy 2 z ostatnich 6 tygodni. Wypisz chronologicznie wszystkie wzmianki o terminie i zaznacz, jeśli któreś się ze sobą kłócą.</div>
+  </div>
+</section>
+
+<!-- ============================ 8 ============================ -->
+<section class="chapter" id="signals">
+  <div class="chap-head reveal"><div class="chap-num">8</div><div><h2>Nietrywialny scenariusz: ukryte sygnały opóźnień i wpływ zmian zakresu</h2><span class="tag">nikt nie napisze wprost „jesteśmy spóźnieni” — ale ktoś napisze „czekamy na”</span></div></div>
+
+  <p class="reveal">Opóźnienia rzadko ogłasza się jednym jasnym mailem. Rozkładają się na dziesiątki wątków, w których
+  ktoś pisze „czekamy na akceptację”, „to może się przesunąć” albo „jeszcze nie mieliśmy czasu”. Pojedynczo brzmią
+  niegroźnie. Zebrane razem i policzone — to wzorzec. Copilot, poproszony o skan słownictwa ryzyka w wątkach, potrafi
+  wyłapać te frazy szybciej niż ktokolwiek czytający maile po kolei.</p>
+
+  <figure class="fig wide" id="fig-signals">
+    <div class="ftitle">▶ Skan wątków pod kątem języka ryzyka <span>uruchom skan, patrz na podświetlone frazy</span></div>
+    <div class="ctrl"><button class="btn primary" data-act="scan">🔍 Skanuj wątki</button><button class="btn" data-act="reset">↺ Reset</button></div>
+    <div id="sig-list"></div>
+    <div class="sig-meter"><div class="status" id="sig-status" style="flex:1">Kliknij „Skanuj wątki”.</div></div>
+  </figure>
+
+  <div class="box usecase reveal"><span class="lbl">💼 Druga część: wpływ zmiany zakresu na koszt i harmonogram</span>
+    <p><b>Problem:</b> sponsor prosi o „drobną” zmianę zakresu w trakcie projektu. Trzeba szybko policzyć realny
+    wpływ na koszt i termin, zanim się zgodzisz — a potem to uzasadnić w komitecie sterującym.</p>
+    <div class="calc" id="impact-calc">
+      <label>Dodatkowe godziny pracy<input type="number" id="imp-hours" value="120" min="0"></label>
+      <label>Stawka zespołu (PLN/h)<input type="number" id="imp-rate" value="180" min="0"></label>
+      <label>Bufor ryzyka (%)<input type="number" id="imp-buffer" value="15" min="0" max="100"></label>
+    </div>
+    <div class="status impact-out" id="impact-out"></div>
+    <ol>
+      <li>W Excelu policz podstawowy wpływ: dodatkowe godziny × stawka zespołu.</li>
+      <li>Dodaj bufor ryzyka procentowo (harmonogram rzadko ślizga się tylko o wyliczoną wartość).</li>
+      <li>Poproś Excel Copilot o scenariusz „co jeśli” z trzema wariantami buforu (10%/15%/25%).</li>
+      <li>Poproś Word Copilot: „napisz krótki impact statement dla komitetu sterującego na podstawie tego wyliczenia —
+      wpływ na koszt, wpływ na termin, rekomendacja”.</li>
+      <li>Podepnij arkusz jako załącznik/źródło, żeby liczby w statement się z nim zgadzały.</li>
+      <li>Przed wysłaniem porównaj liczby w tekście z arkuszem ręcznie — patrz rozdział 10.</li>
+    </ol>
+    <div class="prompt-ex"><b>przykładowy prompt (Word)</b>Na podstawie załączonego arkusza z wyliczeniem wpływu zmiany zakresu napisz krótki "impact statement" dla komitetu sterującego: wpływ na koszt, wpływ na harmonogram, rekomendacja. Maksymalnie 150 słów.</div>
+  </div>
+</section>
+
+<!-- ============================ 9 ============================ -->
+<section class="chapter" id="agent">
+  <div class="chap-head reveal"><div class="chap-num">9</div><div><h2>Nietrywialny scenariusz: własny agent PM i prezentacja dla sponsora</h2><span class="tag">agent, który odpowiada tylko z tego, co mu wolno wiedzieć</span></div></div>
+
+  <p class="reveal">Kiedy pytania od interesariuszy powtarzają się co tydzień („jaki jest status?”, „kiedy koniec fazy 2?”),
+  można w <b>Copilot Studio</b> zbudować własnego agenta — „Status Bot” — podłączonego wyłącznie do wybranych źródeł
+  (np. dokument statusu, harmonogram, RAID log). Kluczowa własność: agent dziedziczy <b>Twoje</b> uprawnienia twórcy
+  i jest ograniczony do podłączonych źródeł — nie przeszukuje całego Grafu jak zwykły Copilot Chat, tylko to, co mu
+  wskazałeś.</p>
+
+  <figure class="fig wide" id="fig-agent">
+    <div class="ftitle">▶ Status Bot w rozmowie ze sponsorem <span>zadaj pytanie w zakresie źródeł albo poza nim</span></div>
+    <div class="ctrl">
+      <button class="btn primary" data-q="0">„Jaki jest status fazy 2?”</button>
+      <button class="btn primary" data-q="1">„Jaka jest premia PM-a w tym projekcie?”</button>
+      <button class="btn" data-act="reset">↺ Reset</button>
+    </div>
+    <div class="chat-log" id="agent-chat"></div>
+    <figcaption>Trzy podłączone źródła w tym przykładzie: dokument statusu, harmonogram, RAID log — agent nie ma
+    dostępu do reszty Grafu, nawet jeśli jego twórca by go miał.</figcaption>
+  </figure>
+
+  <div class="box usecase reveal"><span class="lbl">💼 Druga część: prezentacja dla sponsora z dokumentu Word</span>
+    <p><b>Problem:</b> masz już solidny, długi dokument statusu w Wordzie, a sponsor chce 6 slajdów na jutro rano,
+    nie 8 stron tekstu.</p>
+    <ol>
+      <li>W PowerPoincie otwórz Copilota i wybierz „Utwórz prezentację z pliku”.</li>
+      <li>Wskaż dokument Word ze statusem jako źródło.</li>
+      <li>Poproś o docelową długość i ton: „6 slajdów, dla sponsora spoza zespołu technicznego, bez żargonu”.</li>
+      <li>Przejrzyj wygenerowaną strukturę — Copilot sam decyduje, co jest „nagłówkiem slajdu”, więc kolejność
+      czasem trzeba poprawić ręcznie.</li>
+      <li>Poproś o dodanie jednego slajdu podsumowującego RAID log (top 3 ryzyka) — jeśli źródło go nie zawierało,
+      dołącz je jako drugi plik.</li>
+      <li>Przećwicz historię mówioną do slajdów — wygenerowany tekst to szkielet, nie gotowy skrypt na scenę.</li>
+    </ol>
+    <div class="prompt-ex"><b>przykładowy prompt (PowerPoint, „Utwórz prezentację z pliku”)</b>Zrób 6-slajdową prezentację z tego dokumentu statusu dla sponsora bez tła technicznego. Dodaj slajd z top 3 ryzykami na końcu.</div>
+  </div>
+</section>
+
+<!-- ============================ 10 ============================ -->
+<section class="chapter" id="pitfalls">
+  <div class="chap-head reveal"><div class="chap-num">10</div><div><h2>Dobre praktyki i pułapki</h2><span class="tag">te same mechanizmy, które robią Copilota użytecznym, robią go niebezpiecznym bez weryfikacji</span></div></div>
+
+  <p class="reveal">Trzy rzeczy warto mieć odruchowo w głowie, zanim wyślesz cokolwiek wygenerowanego dalej: liczby
+  potrafią być <em>halucynowane</em> nawet przy dobrym groundingu (model dopisuje szczegół, którego nie było w źródle,
+  żeby zdanie brzmiało płynniej), precyzja promptu decyduje o jakości bardziej niż sama moc modelu, a agent zbudowany
+  w Copilot Studio ma dokładnie tyle uprawnień, ile ma jego twórca — więc jeśli zbudujesz agenta na swoim koncie
+  z szerokim dostępem, każdy, kto z nim rozmawia, pośrednio korzysta z <em>Twoich</em> uprawnień.</p>
+
+  <figure class="fig wide" id="fig-trust">
+    <div class="ftitle">▶ Ta sama liczba, dwie ścieżki <span>Copilot podaje budżet fazy 3 — co robisz dalej?</span></div>
+    <div class="ctrl">
+      <button class="btn primary" data-act="verify">🔎 Zweryfikuj źródło przed wysłaniem</button>
+      <button class="btn bad" data-act="skip">🚀 Wyślij od razu do sponsora</button>
+      <button class="btn" data-act="reset">↺ Reset</button>
+    </div>
+    <div class="two">
+      <div class="trust-path good" id="trust-good"><b>Ścieżka A</b></div>
+      <div class="trust-path bad" id="trust-bad"><b>Ścieżka B</b></div>
+    </div>
+  </figure>
+
+  <div class="box bullets reveal"><span class="lbl">📌 Celne spostrzeżenia</span>
+    <ul>
+      <li><b>Sprawdzaj liczby u źródła</b> — cytowanie pokazuje, skąd model wziął fakt; nie zakładaj, że jest dosłownie poprawny.</li>
+      <li><b>Precyzyjny prompt &gt; ogólny prompt.</b> „Podsumuj” daje ogólnik; „podsumuj w 3 zdaniach, skup się na ryzykach
+      z priorytetem powyżej 15” daje coś użytecznego.</li>
+      <li><b>Uprawnienia agenta = uprawnienia twórcy.</b> Nie buduj współdzielonego agenta na koncie z dostępem do danych,
+      których inni nie powinni widzieć nawet pośrednio.</li>
+      <li><b>Nie automatyzuj wysyłki decyzji krytycznych</b> (budżet, terminy kontraktowe, komunikacja do zarządu) bez
+      ludzkiej weryfikacji w pętli — automatyzuj zbieranie i szkic, nie „wyślij”.</li>
+    </ul>
+  </div>
+
+  <div class="box nodumb reveal"><span class="lbl">❓ Nie istnieją głupie pytania</span>
+    <div class="qa">
+      <div class="q">P:</div><div>Jeśli grounding jest tak dobry, to skąd w ogóle biorą się halucynacje?</div>
+      <div class="a">O:</div><div>Model wciąż <em>generuje</em> tekst słowo po słowie — grounding zmniejsza ryzyko,
+      ale go nie zeruje. Najczęstsze źródło: dwa podobne dokumenty z różnymi liczbami (stara i nowa wersja budżetu),
+      a model łączy fragmenty obu w jedno zdanie, które nie istniało w żadnym z nich osobno.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 11 ============================ -->
+<section class="chapter" id="final">
+  <div class="chap-head reveal"><div class="chap-num">11</div><div><h2>Egzamin + ściąga</h2><span class="tag">sprawdź, co zostało w głowie</span></div></div>
+
+  <p class="reveal">12 pytań, każde testuje mechanizm z poprzednich rozdziałów, nie samą nazwę funkcji.</p>
+
+  <div id="quiz"></div>
+  <div class="score" id="score">Wynik: 0 / 0</div>
+
+  <h3 class="reveal">Ściąga</h3>
+  <div class="scroll-x reveal">
+  <table class="mini cheat">
+    <thead><tr><th>Funkcja / pojęcie</th><th>Co robi</th><th>Kiedy użyć</th></tr></thead>
+    <tbody>
+      <tr><td>Grounding</td><td>Wyszukiwanie w Graphie przed odpowiedzią modelu</td><td>Zawsze działa w tle — sprawdzaj cytowania</td></tr>
+      <tr><td>Microsoft Graph</td><td>Wspólny indeks maili, plików, spotkań, czatów</td><td>Źródło prawdy dla wszystkich odpowiedzi z kontekstem firmowym</td></tr>
+      <tr><td>Model uprawnień</td><td>Copilot widzi tylko to, co widzi pytający</td><td>Zakładaj przy każdym pytaniu zespołowym</td></tr>
+      <tr><td>Podsumowanie wątku (Outlook)</td><td>Redukuje długi wątek do kluczowych punktów</td><td>Wracasz do wątku po urlopie / przed spotkaniem</td></tr>
+      <tr><td>Coach by Copilot</td><td>Ocenia ton i jasność Twojego szkicu</td><td>Maile do sponsora, trudne wiadomości</td></tr>
+      <tr><td>Action items (Teams)</td><td>Ekstrakcja zobowiązań z transkrypcji</td><td>Zawsze po spotkaniu z transkrypcją — potwierdź ręcznie</td></tr>
+      <tr><td>Priorytet ryzyka</td><td>Wpływ × Prawdopodobieństwo (1–5 każde)</td><td>Sortowanie RAID logu</td></tr>
+      <tr><td>Business Chat</td><td>Zapytanie łączące wiele aplikacji naraz</td><td>Cotygodniowy status, przegląd historii komunikacji</td></tr>
+      <tr><td>Utwórz prezentację z pliku</td><td>Word/PDF → szkielet slajdów PowerPoint</td><td>Szybki skrót dla sponsora bez czasu na dokument</td></tr>
+      <tr><td>Copilot Studio agent</td><td>Własny bot ograniczony do podłączonych źródeł</td><td>Powtarzalne pytania od interesariuszy (status bot)</td></tr>
+      <tr><td>Uprawnienia agenta = uprawnienia twórcy</td><td>Agent nie ma własnej, szerszej tożsamości</td><td>Zawsze sprawdzaj, na czyim koncie powstał współdzielony agent</td></tr>
+      <tr><td>Halucynacja liczby</td><td>Model łączy fragmenty w zdanie, którego nie było w źródle</td><td>Każda liczba trafiająca dalej niż do Ciebie — zweryfikuj u źródła</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="box relax reveal"><span class="lbl">🎓 Gratulacje</span>
+    <p>Przeszedłeś całą drogę: od grounding przez Graph, przez uprawnienia, Outlook, Teams, Excel/Word/PowerPoint,
+    po cztery nietrywialne scenariusze PM i pułapki. Wróć do pytania z rozdziału 0 — Twój pomysł na asystenta,
+    który „nie wie więcej niż pytający”, prawdopodobnie wygląda teraz podejrzanie podobnie do prawdziwego Copilota.
+    Następny krok: weź jeden realny, powtarzalny raport, który robisz co tydzień ręcznie, i spróbuj zbudować dla niego
+    jeden dobry prompt w Business Chat — potem powtarzaj go co tydzień, aż stanie się nawykiem.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  Przewodnik edukacyjny w jednym pliku HTML — bez frameworków, bez build-stepu, bez zależności sieciowych.
+  Animacje: SVG i IntersectionObserver. Microsoft 365, Copilot, Outlook, Teams, Excel, Word i PowerPoint są znakami
+  towarowymi Microsoft Corporation; ta strona nie jest z Microsoftem powiązana ani przez niego sponsorowana.
+  · <a href="https://github.com/gbryk1/html-tools-local-llm" target="_blank" rel="noopener">Źródło na GitHubie</a>
+  · <a href="index.html">Inne narzędzia</a>
+</footer>
+
+<script>
+'use strict';
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SVGNS = 'http://www.w3.org/2000/svg';
+const sleep = ms => new Promise(r => setTimeout(r, REDUCE ? 0 : ms));
+function S(tag, attrs = {}, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function T(parent, x, y, text, attrs = {}) {
+  const t = S('text', Object.assign({ x, y, 'text-anchor': 'middle' }, attrs), parent);
+  t.textContent = text;
+  return t;
+}
+function H(tag, cls, html, parent) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html != null) e.innerHTML = html;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const ease = k => (k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+function tween(ms, fn) {
+  return new Promise(res => {
+    if (REDUCE || ms <= 0) { fn(1); return res(); }
+    const t0 = performance.now();
+    const step = t => {
+      const k = Math.min(1, (t - t0) / ms);
+      fn(ease(k));
+      if (k < 1) requestAnimationFrame(step); else res();
+    };
+    requestAnimationFrame(step);
+  });
+}
+function flyDot(parent, x0, y0, x1, y1, { ms = 600, color, r = 5 } = {}) {
+  const c = S('circle', { cx: x0, cy: y0, r, class: 'fly' }, parent);
+  c.style.fill = color || C.accent;
+  return tween(ms, k => { c.setAttribute('cx', x0 + (x1 - x0) * k); c.setAttribute('cy', y0 + (y1 - y0) * k); }).then(() => c.remove());
+}
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C = {};
+function readColors() { for (const k of ['ink', 'paper', 'paper2', 'mut', 'line', 'accent', 'accent2', 'ok', 'bad', 'warn', 'dim', 'card']) C[k] = cssVar('--' + k); }
+readColors();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+function ringXY(cx, cy, r, f) { const a = f * 2 * Math.PI - Math.PI / 2; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+
+/* ---------- scroll machinery ---------- */
+const bar = $('#progress');
+let ticking = false;
+addEventListener('scroll', () => {
+  if (ticking) return; ticking = true;
+  requestAnimationFrame(() => {
+    const h = document.documentElement.scrollHeight - innerHeight;
+    bar.style.transform = `scaleX(${h > 0 ? scrollY / h : 0})`;
+    document.body.classList.toggle('past-cover', scrollY > innerHeight * .8);
+    ticking = false;
+  });
+}, { passive: true });
+
+const revealIO = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting) { e.target.classList.add('shown'); revealIO.unobserve(e.target); }
+}), { threshold: 0.12 });
+$$('.reveal').forEach(el => revealIO.observe(el));
+
+const tocLinks = new Map($$('#toc a').map(a => [a.getAttribute('href').slice(1), a]));
+const tocIO = new IntersectionObserver(es => es.forEach(e => {
+  if (!e.isIntersecting) return;
+  tocLinks.forEach(a => a.classList.remove('active'));
+  const a = tocLinks.get(e.target.id); if (a) a.classList.add('active');
+}), { rootMargin: '-35% 0px -60% 0px' });
+$$('section.chapter').forEach(s => tocIO.observe(s));
+
+const figIO = new IntersectionObserver(es => es.forEach(e => {
+  const f = e.target._fig; if (!f) return;
+  if (e.isIntersecting) {
+    if (f.visible) return;
+    f.visible = true;
+    if (!f.seen) { f.seen = true; f.first && f.first(); }
+    f.enter && f.enter();
+  } else if (f.visible) {
+    f.visible = false; f.leave && f.leave();
+  }
+}), { threshold: 0.25 });
+function registerFig(el, api) { el._fig = api; figIO.observe(el); return api; }
+
+/* enqueue helper: serialize animation runs, drop excess clicks */
+function makeQueue() {
+  let queue = Promise.resolve(), pending = 0;
+  return fn => { if (pending >= 3) return; pending++; queue = queue.then(fn).catch(e => console.error(e)).finally(() => pending--); };
+}
+
+/* ---------- cover ---------- */
+(() => {
+  const g = $('#cover-nodes');
+  const icons = ['✉️', '📄', '📅', '💬', '✅', '📊', '🗂️', '👥'];
+  for (let i = 0; i < 8; i++) {
+    const [x, y] = ringXY(200, 200, 150, i / 8);
+    const c = S('circle', { cx: x, cy: y, r: 17 }, g);
+    c.style.fill = C.paper2; c.style.stroke = C.ink; c.style.strokeWidth = 3;
+    T(g, x, y + 6, icons[i], { 'font-size': 16 });
+  }
+})();
+
+/* ---------- 1. grounding / Graph flow ---------- */
+(() => {
+  const root = $('#fig-graph'), svg = $('svg', root), st = $('#graph-status', root), toggle = $('#graph-toggle', root);
+  const enqueue = makeQueue();
+  const sources = [
+    { key: 'mail', label: '✉️ Poczta', x: 560, y: 40 },
+    { key: 'files', label: '📄 Pliki', x: 640, y: 110 },
+    { key: 'meet', label: '📅 Spotkania', x: 640, y: 190 },
+    { key: 'chat', label: '💬 Czaty', x: 560, y: 260 },
+  ];
+  const QUESTIONS = [
+    { text: 'Jaki jest status projektu Feniks?', hits: ['mail', 'files', 'meet'] },
+    { text: 'Kto ma dosłać makietę do piątku?', hits: ['chat', 'mail'] },
+  ];
+  const gE = S('g', {}, svg), gN = S('g', {}, svg), gFx = S('g', {}, svg);
+  const user = { x: 60, y: 150 }, graphNode = { x: 300, y: 150 }, llm = { x: 460, y: 150 };
+  function box(p, w, h, label, sub) {
+    const g = S('g', { class: 'nd' }, gN);
+    S('rect', { x: p.x - w / 2, y: p.y - h / 2, width: w, height: h, rx: 10 }, g);
+    T(g, p.x, p.y - (sub ? 4 : -5), label, { 'font-size': 13 });
+    if (sub) T(g, p.x, p.y + 14, sub, { 'font-size': 10, class: 'mut' });
+    return g;
+  }
+  box(user, 92, 54, '🧑‍💼 Ty', 'pytanie');
+  const gGraph = box(graphNode, 108, 54, 'Microsoft', 'Graph search');
+  const gLLM = box(llm, 92, 54, '🤖 LLM', 'pisze odpowiedź');
+  S('line', { x1: user.x + 46, y1: user.y, x2: graphNode.x - 54, y2: graphNode.y, class: 'edge' }, gE);
+  S('line', { x1: graphNode.x + 54, y1: graphNode.y, x2: llm.x - 46, y2: llm.y, class: 'edge' }, gE);
+  const srcG = {};
+  sources.forEach(s => {
+    const g = box(s, 92, 40, s.label, '');
+    S('line', { x1: graphNode.x + 40, y1: graphNode.y, x2: s.x - 46, y2: s.y, class: 'edge' }, gE);
+    srcG[s.key] = g;
+  });
+  const ansBox = T(svg, 460, 150, '', { 'font-size': 0 });
+
+  async function runQuery(qi) {
+    const q = QUESTIONS[qi];
+    sources.forEach(s => srcG[s.key].classList.remove('hot', 'off'));
+    if (!toggle.checked) {
+      st.textContent = `Dostęp do Grafu wyłączony: „${q.text}” — model odpowiada wyłącznie z ogólnej wiedzy, bez cytowań. Ryzyko zmyślenia rośnie.`;
+      st.className = 'status warn';
+      await flyDot(gFx, user.x + 46, user.y, llm.x - 46, llm.y, { ms: 500, color: C.warn });
+      return;
+    }
+    st.textContent = `Pytanie: „${q.text}” — wyszukiwanie w Grafie…`;
+    st.className = 'status';
+    await flyDot(gFx, user.x + 46, user.y, graphNode.x - 50, graphNode.y, { ms: 450, color: C.accent });
+    for (const s of sources) {
+      const on = q.hits.includes(s.key);
+      srcG[s.key].classList.toggle('hot', on);
+      if (on) await flyDot(gFx, graphNode.x + 40, graphNode.y, s.x - 46, s.y, { ms: 320, color: C.accent2, r: 4 });
+      await sleep(60);
+    }
+    await sleep(150);
+    for (const s of sources) if (q.hits.includes(s.key)) flyDot(gFx, s.x - 46, s.y, graphNode.x + 30, graphNode.y, { ms: 380, color: C.accent2, r: 4 });
+    await sleep(420);
+    await flyDot(gFx, graphNode.x + 54, graphNode.y, llm.x - 46, llm.y, { ms: 420, color: C.ok });
+    st.textContent = `Znaleziono kontekst w: ${q.hits.map(k => sources.find(s => s.key === k).label).join(', ')}. Model pisze odpowiedź z cytowaniami tych źródeł.`;
+    st.className = 'status ok';
+  }
+  $$('[data-q]', root).forEach(b => b.onclick = () => enqueue(() => runQuery(+b.dataset.q)));
+  registerFig(root, { first() { enqueue(() => runQuery(0)); } });
+})();
+
+/* ---------- 2. permissions ---------- */
+(() => {
+  const root = $('#fig-perm'), svg = $('svg', root), st = $('#perm-status', root);
+  const enqueue = makeQueue();
+  let current = 'ala';
+  $$('.perm-users button', root).forEach(b => b.onclick = () => {
+    $$('.perm-users button', root).forEach(x => x.classList.remove('on'));
+    b.classList.add('on'); current = b.dataset.user;
+  });
+  const gN = S('g', {}, svg), gFx = S('g', {}, svg);
+  const userP = { x: 75, y: 140 }, copilot = { x: 205, y: 140 }, folder = { x: 350, y: 60 }, answerP = { x: 335, y: 220 };
+  function box(p, w, h, label) { const g = S('g', { class: 'nd' }, gN); S('rect', { x: p.x - w / 2, y: p.y - h / 2, width: w, height: h, rx: 10 }, g); T(g, p.x, p.y + 5, label, { 'font-size': 12 }); return g; }
+  box(userP, 108, 46, '🧑 osoba pytająca');
+  box(copilot, 90, 46, '🤖 Copilot');
+  const gFolder = box(folder, 120, 44, '📁 Budżet');
+  T(gFolder, folder.x, folder.y + 20, 'ACL: tylko PM', { 'font-size': 9, class: 'mut' });
+  const ansW = 170, ansH = 60;
+  const gAns = S('g', { class: 'nd' }, gN);
+  S('rect', { x: answerP.x - ansW / 2, y: answerP.y - ansH / 2, width: ansW, height: ansH, rx: 10 }, gAns);
+  const ansL1 = T(gAns, answerP.x, answerP.y - 3, '', { 'font-size': 11 });
+  const ansL2 = T(gAns, answerP.x, answerP.y + 13, '', { 'font-size': 11 });
+  S('line', { x1: userP.x + 54, y1: userP.y, x2: copilot.x - 45, y2: copilot.y, class: 'edge' }, gN);
+
+  async function ask() {
+    const isAla = current === 'ala';
+    st.textContent = 'Sprawdzanie uprawnień w Graphie…';
+    await flyDot(gFx, userP.x + 54, userP.y, copilot.x - 45, copilot.y, { ms: 400, color: C.accent });
+    await flyDot(gFx, copilot.x, copilot.y - 23, folder.x - 30, folder.y + 15, { ms: 400, color: C.accent });
+    if (isAla) {
+      gFolder.classList.add('hot'); gFolder.classList.remove('off');
+      ansL1.textContent = 'Budżet: 420 000 PLN,';
+      ansL2.textContent = 'wykorzystano 61%';
+      st.textContent = 'Ala ma dostęp do folderu „Budżet” (jest PM-em) → Copilot pokazuje konkretną liczbę z cytowaniem.';
+      st.className = 'status ok';
+    } else {
+      gFolder.classList.remove('hot'); gFolder.classList.add('off');
+      ansL1.textContent = 'Nie mam dostępu';
+      ansL2.textContent = 'do tych danych';
+      st.textContent = 'Bartek (kontraktor) nie ma dostępu do folderu „Budżet” → Copilot nie pokaże liczby, nawet jeśli ją „widział” przy innym pytaniu.';
+      st.className = 'status warn';
+    }
+  }
+  $('[data-act=ask]', root).onclick = () => enqueue(ask);
+  registerFig(root, { first() { enqueue(ask); } });
+})();
+
+/* ---------- 3. outlook mail stack ---------- */
+(() => {
+  const root = $('#fig-outlook'), col = $('#mail-col', root), out = $('#mail-out', root);
+  const enqueue = makeQueue();
+  const subjects = ['Re: Zakres fazy 2', 'Re: Re: Zakres fazy 2', 'FW: budżet dodatkowy', 'Re: Re: Re: Zakres fazy 2',
+    'pytanie o termin', 'Re: pytanie o termin', 'materiały od klienta', 'Re: Zakres fazy 2 (2)', 'notatka ze spotkania',
+    'Re: Re: budżet dodatkowy', 'aktualizacja harmonogramu', 'Re: aktualizacja harmonogramu'];
+  function fillMails() {
+    col.innerHTML = '';
+    for (let i = 0; i < 12; i++) H('div', 'mail-chip', subjects[i % subjects.length], col);
+  }
+  fillMails();
+  function resetOut() { out.innerHTML = '<h5>Wynik</h5><p class="mut small">Wybierz akcję powyżej.</p>'; }
+
+  async function summarize() {
+    out.innerHTML = '<h5>Podsumowanie wątku (27 maili)</h5><ul>' +
+      ['Klient zaakceptował wstępny zakres fazy 2, ale poprosił o dodatkowy moduł raportowania.',
+        'Zespół zgłosił, że dodatkowy moduł wymaga +80 godzin i przesunięcia o tydzień.',
+        'Otwarte pytanie: kto pokrywa koszt dodatkowych godzin — klient czy bufor projektu?',
+        'Decyzja o budżecie odłożona do spotkania w czwartek.'].map(t => `<li>${t}</li>`).join('') + '</ul>';
+    const items = $$('li', out);
+    for (const li of items) { li.classList.add('shown'); await sleep(180); }
+    $$('.mail-chip', col).forEach((c, i) => setTimeout(() => c.style.opacity = '.35', i * 25));
+  }
+  async function draft() {
+    out.innerHTML = '<h5>Draft odpowiedzi</h5><p>„Dziękuję za cierpliwość — w związku z dodatkowym zakresem proponujemy' +
+      ' przesunięcie terminu fazy 2 o tydzień, na 14.10. Potwierdzicie Państwo ten termin do piątku?”</p>' +
+      '<p class="mut small">Wygenerowano z instrukcji: „zaproponuj przesunięcie o tydzień”.</p>';
+    $$('p', out).forEach((p, i) => setTimeout(() => p.classList.add('shown'), i * 220));
+  }
+  async function coach() {
+    out.innerHTML = '<h5>Ocena Coach by Copilot</h5>' +
+      '<p><span class="tone-pill" style="background:color-mix(in srgb, var(--warn) 30%, var(--paper2))">ton: trochę przepraszający</span></p>' +
+      '<p>Zdanie „przepraszam za zamieszanie” pojawia się dwa razy, choć zmiana wyszła od klienta — możesz je usunąć.</p>' +
+      '<p>Brakuje jasno postawionego pytania z terminem odpowiedzi — dodaj konkretną datę.</p>';
+    $$('p', out).forEach((p, i) => setTimeout(() => p.classList.add('shown'), i * 220));
+  }
+  $('[data-act=summarize]', root).onclick = () => enqueue(summarize);
+  $('[data-act=draft]', root).onclick = () => enqueue(draft);
+  $('[data-act=coach]', root).onclick = () => enqueue(coach);
+  $('[data-act=reset]', root).onclick = () => enqueue(async () => { fillMails(); resetOut(); });
+  registerFig(root, { first() { enqueue(summarize); } });
+})();
+
+/* ---------- 4. teams pipeline ---------- */
+(() => {
+  const root = $('#fig-teams', document);
+  const pTrans = $('#p-trans .body', root), pExtract = $('#p-extract .body', root), pAssign = $('#p-assign .body', root);
+  const st = $('#teams-status', root);
+  const enqueue = makeQueue();
+  const clean = [
+    { line: 'Kasia: ja przygotuję makietę do piątku.', item: 'Przygotować makietę', owner: 'Kasia', due: 'piątek', low: false },
+    { line: 'Marek: dobra, ja wtedy podepnę ją do briefu.', item: 'Podpiąć makietę do briefu', owner: 'Marek', due: '—', low: false },
+    { line: 'Ala: zapytam klienta o akceptację budżetu.', item: 'Zapytać klienta o budżet', owner: 'Ala', due: '—', low: false },
+  ];
+  const noisy = { line: '[Kasia, Marek i Ala mówią naraz — fragment nieczytelny]', item: 'coś z budżetem…?', owner: '⚠️ niepewne', due: '⚠️', low: true };
+  function reset() { pTrans.innerHTML = ''; pExtract.innerHTML = ''; pAssign.innerHTML = ''; st.textContent = 'Kliknij „Uruchom”, żeby zobaczyć pipeline w akcji.'; st.className = 'status'; }
+  reset();
+  async function run(withNoise) {
+    pTrans.innerHTML = ''; pExtract.innerHTML = ''; pAssign.innerHTML = '';
+    const rows = withNoise ? [...clean, noisy] : clean;
+    st.textContent = 'Czytam transkrypcję…';
+    for (const r of rows) { const d = H('div', 'small', r.line, pTrans); d.style.opacity = 0; await sleep(140); d.style.transition = 'opacity .3s'; d.style.opacity = 1; }
+    await sleep(200);
+    st.textContent = 'Wyłapuję zdania brzmiące jak zobowiązanie…';
+    for (const r of rows) {
+      const a = H('div', 'aitem' + (r.low ? ' low' : ''), `<b>${r.item}</b>`, pExtract);
+      await sleep(160); a.classList.add('shown');
+    }
+    await sleep(250);
+    st.textContent = 'Przypisuję właściciela i termin…';
+    for (const r of rows) {
+      const a = H('div', 'aitem' + (r.low ? ' low' : ''), `<b>${r.item}</b><div class="meta">👤 ${r.owner} · 📅 ${r.due}</div>`, pAssign);
+      await sleep(160); a.classList.add('shown');
+    }
+    st.textContent = withNoise
+      ? 'Fragment z przegadanymi osobami trafił jako "niepewny" — Copilot świadomie oznacza niską pewność zamiast zgadywać właściciela.'
+      : '3 zadania z właścicielem i terminem gotowe do potwierdzenia i wysłania.';
+    st.className = withNoise ? 'status warn' : 'status ok';
+  }
+  $('[data-act=run]', root).onclick = () => enqueue(() => run(false));
+  $('[data-act=noise]', root).onclick = () => enqueue(() => run(true));
+  $('[data-act=reset]', root).onclick = () => enqueue(async () => reset());
+  registerFig(root, { first() { enqueue(() => run(false)); } });
+})();
+
+/* ---------- 5. RAID table ---------- */
+(() => {
+  const root = $('#fig-raid'), body = $('#raid-body', root), st = $('#raid-status', root);
+  const enqueue = makeQueue();
+  let rows = [
+    { name: 'Klient nie zaakceptował zakresu fazy 2', owner: 'Ala', impact: 4, prob: 4, status: 'Otwarte' },
+    { name: 'Kluczowy developer na urlopie w kwietniu', owner: 'Marek', impact: 3, prob: 5, status: 'Monitorowane' },
+    { name: 'Dostawca API może opóźnić integrację', owner: 'Kasia', impact: 5, prob: 2, status: 'Otwarte' },
+  ];
+  const extra = { name: 'Serwer testowy padał 2x w tym tygodniu', owner: 'Tomek', impact: 3, prob: 3, status: 'Nowe' };
+  function prioColor(p) { if (p >= 15) return C.bad; if (p >= 8) return C.warn; return C.ok; }
+  function render(flashLast) {
+    body.innerHTML = '';
+    rows.forEach((r, i) => {
+      const tr = H('tr', i === rows.length - 1 && flashLast ? 'new-row' : '', '', body);
+      tr.innerHTML = `<td>${r.name}</td><td>${r.owner}</td>
+        <td><input type="range" min="1" max="5" value="${r.impact}" data-k="impact" data-i="${i}"> <span class="iv">${r.impact}</span></td>
+        <td><input type="range" min="1" max="5" value="${r.prob}" data-k="prob" data-i="${i}"> <span class="pv">${r.prob}</span></td>
+        <td><span class="prio-cell" data-i="${i}"></span></td>
+        <td>${r.status}</td>`;
+    });
+    update();
+  }
+  function update() {
+    $$('.prio-cell', body).forEach(cell => {
+      const i = +cell.dataset.i, r = rows[i], p = r.impact * r.prob;
+      cell.textContent = p;
+      cell.style.background = prioColor(p); cell.style.color = '#fff';
+    });
+  }
+  body.addEventListener('input', e => {
+    const k = e.target.dataset.k; if (!k) return;
+    const i = +e.target.dataset.i; rows[i][k] = +e.target.value;
+    e.target.nextElementSibling.textContent = e.target.value;
+    update();
+    st.textContent = `Priorytet „${rows[i].name}” = ${rows[i].impact} × ${rows[i].prob} = ${rows[i].impact * rows[i].prob}.`;
+    st.className = 'status';
+  });
+  async function addFromNote() {
+    rows.push({ ...extra });
+    render(true);
+    st.textContent = 'Nowy wiersz dodany z notatki spotkania — wpływ i prawdopodobieństwo trzeba potwierdzić ręcznie (Copilot ich nie zgaduje).';
+    st.className = 'status warn';
+  }
+  $('[data-act=add]', root).onclick = () => enqueue(addFromNote);
+  $('[data-act=reset]', root).onclick = () => enqueue(async () => {
+    rows = [
+      { name: 'Klient nie zaakceptował zakresu fazy 2', owner: 'Ala', impact: 4, prob: 4, status: 'Otwarte' },
+      { name: 'Kluczowy developer na urlopie w kwietniu', owner: 'Marek', impact: 3, prob: 5, status: 'Monitorowane' },
+      { name: 'Dostawca API może opóźnić integrację', owner: 'Kasia', impact: 5, prob: 2, status: 'Otwarte' },
+    ];
+    render(false);
+    st.textContent = 'Priorytet = Wpływ × Prawdopodobieństwo. Kolor rośnie wraz z pilnością.';
+    st.className = 'status';
+  });
+  render(false);
+  registerFig(root, { first() { enqueue(async () => { rows[0].impact = 5; render(true); update(); }); } });
+})();
+
+/* ---------- 6. status aggregation ---------- */
+(() => {
+  const root = $('#fig-status'), week = $('#week-row', root), log = $('#status-log', root), doc = $('#status-doc', root);
+  const enqueue = makeQueue();
+  const days = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
+  const icons = ['✉️', '📄', '✉️', '📅', '✉️', '', ''];
+  const excluded = new Set();
+  function renderWeek() {
+    week.innerHTML = '';
+    days.forEach((d, i) => {
+      const el = H('div', 'day' + (excluded.has(i) ? ' off' : ''), `<span class="ic">${icons[i] || '·'}</span>${d}`, week);
+      el.onclick = () => { if (excluded.has(i)) excluded.delete(i); else excluded.add(i); renderWeek(); };
+    });
+  }
+  renderWeek();
+  async function build() {
+    doc.innerHTML = '';
+    log.textContent = 'Zbieram maile, pliki i spotkania z niewykluczonych dni…';
+    week.querySelectorAll('.day').forEach((el, i) => { if (!excluded.has(i)) setTimeout(() => el.classList.add('hit'), i * 90); });
+    await sleep(days.length * 90 + 200);
+    const sections = [
+      ['Highlights', ['Zaakceptowano makietę fazy 2 (śr).', excluded.has(3) ? null : 'Spotkanie statusowe potwierdziło harmonogram (cz).']],
+      ['Ryzyka', [excluded.has(0) ? null : 'Klient wciąż nie potwierdził dodatkowego budżetu (pn).', 'Dostawca API zgłosił możliwe opóźnienie (śr).']],
+      ['Następne kroki', ['Wysłać zaktualizowany harmonogram do sponsora.', 'Domknąć decyzję budżetową do środy.']],
+    ];
+    for (const [title, items] of sections) {
+      H('h5', '', title, doc);
+      for (const it of items) {
+        if (it === null) { const p = H('p', 'gap', '⚠️ [brak danych — dzień wykluczony z zakresu]', doc); await sleep(150); p.classList.add('shown'); continue; }
+        const p = H('p', '', it, doc); await sleep(150); p.classList.add('shown');
+      }
+    }
+    log.textContent = excluded.size ? `Zbudowano status — ${excluded.size} dzień/dni wykluczono, więc część sekcji ma widoczne luki.` : 'Zbudowano status ze wszystkich 7 dni.';
+    log.className = excluded.size ? 'status warn' : 'status ok';
+  }
+  $('[data-act=build]', root).onclick = () => enqueue(build);
+  $('[data-act=reset]', root).onclick = () => enqueue(async () => { excluded.clear(); renderWeek(); doc.innerHTML = ''; log.textContent = 'Kliknij dzień, żeby wykluczyć go z zakresu (np. urlop), albo od razu zbuduj status.'; log.className = 'status'; });
+  registerFig(root, { first() { enqueue(build); } });
+})();
+
+/* ---------- 7. contradiction timeline ---------- */
+(() => {
+  const root = $('#fig-hard'), svg = $('svg', root), st = $('#hard-status', root);
+  const enqueue = makeQueue();
+  const msgs = [
+    { x: 55, t: '12 sie', who: 'Ty', l1: 'termin fazy 2:', l2: '30 wrz' },
+    { x: 165, t: '18 sie', who: 'Interesariusz', l1: 'ok, 30 wrz', l2: 'działa' },
+    { x: 275, t: '02 wrz', who: 'Ty', l1: 'przypomnienie:', l2: '30 wrz' },
+    { x: 385, t: '09 wrz', who: 'Interesariusz', l1: 'a może 15 paź?', l2: '' },
+    { x: 495, t: '10 wrz', who: 'Ty', l1: '(brak', l2: 'odpowiedzi)' },
+    { x: 605, t: '20 wrz', who: 'Interesariusz', l1: 'przypominam:', l2: '15 paź' },
+    { x: 715, t: '22 wrz', who: 'Ty', l1: 'u mnie wciąż', l2: '30 wrz' },
+  ];
+  const gE = S('g', {}, svg), gN = S('g', {}, svg);
+  const y = 70;
+  S('line', { x1: 25, y1: y, x2: 745, y2: y, class: 'edge' }, gE);
+  const nodeEls = msgs.map((m, i) => {
+    const g = S('g', { class: 'nd' }, gN);
+    S('circle', { cx: m.x, cy: y, r: 9 }, g);
+    T(g, m.x, y + 26, m.t, { 'font-size': 10, class: 'mut' });
+    T(g, m.x, y - 18, m.who, { 'font-size': 9.5, class: 'mut' });
+    const box = S('rect', { x: m.x - 58, y: 130, width: 116, height: 46, rx: 6, opacity: 0 }, gN);
+    box.style.fill = C.card; box.style.stroke = C.line; box.style.strokeWidth = 1.5;
+    const txt = S('text', { x: m.x, y: 152, 'text-anchor': 'middle', 'font-size': 10.5, opacity: 0 }, gN);
+    txt.textContent = m.l1;
+    const txt2 = S('text', { x: m.x, y: 167, 'text-anchor': 'middle', 'font-size': 10.5, opacity: 0 }, gN);
+    txt2.textContent = m.l2;
+    return { g, box, txt, txt2, m };
+  });
+  const conflictLine = S('line', { x1: 275, y1: y, x2: 385, y2: y, class: 'edge', opacity: 0 }, gE);
+  async function reveal() {
+    for (const n of nodeEls) { n.box.setAttribute('opacity', 1); n.txt.setAttribute('opacity', 1); n.txt2.setAttribute('opacity', 1); await sleep(90); }
+  }
+  async function scan() {
+    st.textContent = 'Skanuję historię komunikacji…';
+    for (const n of nodeEls) { n.g.classList.add('pulse'); await sleep(70); n.g.classList.remove('pulse'); }
+    conflictLine.setAttribute('opacity', 1);
+    conflictLine.classList.add('hit');
+    nodeEls[2].g.classList.add('hot'); nodeEls[3].g.classList.add('hot');
+    st.textContent = 'Sprzeczność: 02 wrz potwierdzasz 30 wrz, a 09 wrz interesariusz proponuje 15 paź — bez formalnego zamknięcia starego terminu. To źródło nieporozumienia na spotkaniu.';
+    st.className = 'status warn';
+  }
+  $('[data-act=scan]', root).onclick = () => enqueue(scan);
+  $('[data-act=reset]', root).onclick = () => enqueue(async () => {
+    conflictLine.setAttribute('opacity', 0); conflictLine.classList.remove('hit');
+    nodeEls.forEach(n => n.g.classList.remove('hot'));
+    st.textContent = '7 wiadomości z ostatnich 6 tygodni. Kliknij „Znajdź sprzeczności”.'; st.className = 'status';
+  });
+  registerFig(root, { first() { enqueue(async () => { await reveal(); await scan(); }); } });
+})();
+
+/* ---------- 8a. signal scan ---------- */
+(() => {
+  const root = $('#fig-signals'), list = $('#sig-list', root), st = $('#sig-status', root);
+  const enqueue = makeQueue();
+  const threads = [
+    { who: 'Kasia → Ty', text: 'Czekamy na akceptację klienta, nie mogę ruszyć dalej.', flag: 'Czekamy na' },
+    { who: 'Marek → Zespół', text: 'Termin integracji może się przesunąć, dostawca API nie odpowiada.', flag: 'może się przesunąć' },
+    { who: 'Ala → Ty', text: 'Świetnie, makieta gotowa, wysyłam do przeglądu.', flag: null },
+    { who: 'Tomek → Kasia', text: 'Jeszcze nie mieliśmy czasu przetestować tego modułu.', flag: 'nie mieliśmy czasu' },
+    { who: 'Klient → Ty', text: 'Wciąż czekamy na wasz feedback ws. specyfikacji.', flag: 'czekamy na' },
+  ];
+  function render() {
+    list.innerHTML = '';
+    threads.forEach(t => {
+      const d = H('div', 'thread', `<div class="who">${t.who}</div><div>${t.text}</div>`, list);
+      d._t = t;
+    });
+  }
+  render();
+  async function scan() {
+    st.textContent = 'Skanuję wątki pod kątem języka ryzyka…';
+    let hits = 0;
+    for (const d of $$('.thread', list)) {
+      await sleep(200);
+      const t = d._t;
+      if (t.flag) {
+        d.classList.add('flagged');
+        const html = t.text.replace(t.flag, `<mark class="hit">${t.flag}</mark>`);
+        d.querySelector('div:last-child').innerHTML = html;
+        hits++;
+      }
+    }
+    st.textContent = `${hits} z ${threads.length} wątków zawiera język ryzyka opóźnienia. Pojedynczo niegroźne, razem — wzorzec warty wzmianki w statusie.`;
+    st.className = hits >= 2 ? 'status warn' : 'status';
+  }
+  $('[data-act=scan]', root).onclick = () => enqueue(scan);
+  $('[data-act=reset]', root).onclick = () => enqueue(async () => { render(); st.textContent = 'Kliknij „Skanuj wątki”.'; st.className = 'status'; });
+  registerFig(root, { first() { enqueue(scan); } });
+})();
+
+/* ---------- 8b. impact calc (no figure registration, plain widget) ---------- */
+(() => {
+  const hours = $('#imp-hours'), rate = $('#imp-rate'), buffer = $('#imp-buffer'), out = $('#impact-out');
+  function calc() {
+    const h = +hours.value || 0, r = +rate.value || 0, b = (+buffer.value || 0) / 100;
+    const base = h * r, withBuffer = base * (1 + b);
+    out.innerHTML = `Koszt bazowy: <b>${base.toLocaleString('pl-PL')} PLN</b> · z buforem ryzyka ${(b * 100).toFixed(0)}%:
+      <b>${withBuffer.toLocaleString('pl-PL', { maximumFractionDigits: 0 })} PLN</b> ·
+      szacowany wpływ na harmonogram: <b>${Math.ceil(h / 40)} tyg.</b> (przy 40 h/tydz. zespołu)`;
+  }
+  [hours, rate, buffer].forEach(el => el.addEventListener('input', calc));
+  calc();
+})();
+
+/* ---------- 9. status bot agent ---------- */
+(() => {
+  const root = $('#fig-agent'), chat = $('#agent-chat', root);
+  const enqueue = makeQueue();
+  const Q = [
+    { user: 'Jaki jest status fazy 2?', ok: true, bot: 'Faza 2 jest w toku, 61% zadań ukończone. Główne ryzyko: brak akceptacji klienta dla dodatkowego modułu.', src: 'Źródło: dokument statusu, RAID log' },
+    { user: 'Jaka jest premia PM-a w tym projekcie?', ok: false, bot: 'Nie mam dostępu do takich informacji w podłączonych źródłach (dokument statusu, harmonogram, RAID log).', src: null },
+  ];
+  function reset() { chat.innerHTML = ''; }
+  async function ask(qi) {
+    const q = Q[qi];
+    const um = H('div', 'msg user', q.user, chat); await sleep(60); um.classList.add('shown');
+    await sleep(400);
+    const html = q.src ? `${q.bot}<div class="src-chip">📎 ${q.src}</div>` : q.bot;
+    const bm = H('div', 'msg bot' + (q.ok ? '' : ' deny'), html, chat); await sleep(60); bm.classList.add('shown');
+    chat.scrollTop = chat.scrollHeight;
+  }
+  $$('[data-q]', root).forEach(b => b.onclick = () => enqueue(() => ask(+b.dataset.q)));
+  $('[data-act=reset]', root).onclick = () => enqueue(async () => reset());
+  registerFig(root, { first() { enqueue(() => ask(0)); } });
+})();
+
+/* ---------- 10. trust paths ---------- */
+(() => {
+  const root = $('#fig-trust'), good = $('#trust-good', root), bad = $('#trust-bad', root);
+  const enqueue = makeQueue();
+  function reset() {
+    good.innerHTML = '<b>Ścieżka A — weryfikacja</b>';
+    bad.innerHTML = '<b>Ścieżka B — bez weryfikacji</b>';
+  }
+  reset();
+  async function steps(container, arr, cls) {
+    for (const s of arr) { const d = H('div', 'trust-step', s, container); await sleep(280); d.classList.add('shown'); }
+  }
+  async function verify() {
+    good.innerHTML = '<b>Ścieżka A — weryfikacja</b>';
+    await steps(good, [
+      'Copilot: „budżet fazy 3 to 610 000 PLN”.',
+      'Klikasz cytowanie → otwiera się arkusz źródłowy.',
+      'W arkuszu widzisz 580 000 PLN — starsza wersja pliku niż Copilot myślał.',
+      '✅ Poprawiasz liczbę przed wysłaniem do sponsora.',
+    ]);
+  }
+  async function skip() {
+    bad.innerHTML = '<b>Ścieżka B — bez weryfikacji</b>';
+    await steps(bad, [
+      'Copilot: „budżet fazy 3 to 610 000 PLN”.',
+      'Kopiujesz liczbę prosto do maila do sponsora.',
+      'Sponsor porównuje z własnym arkuszem: różnica 30 000 PLN.',
+      '❌ Tracisz wiarygodność liczb w całym raporcie, nie tylko tej jednej.',
+    ]);
+  }
+  $('[data-act=verify]', root).onclick = () => enqueue(verify);
+  $('[data-act=skip]', root).onclick = () => enqueue(skip);
+  $('[data-act=reset]', root).onclick = () => enqueue(async () => reset());
+  registerFig(root, { first() { enqueue(async () => { await verify(); await skip(); }); } });
+})();
+
+/* ---------- quiz ---------- */
+(() => {
+  const Q = [
+    ['Zanim Copilot napisze odpowiedź na pytanie o Twój projekt, co robi najpierw?',
+      ['Trenuje się na nowo na Twoich danych', 'Wyszukuje kontekst w Microsoft Graph (grounding)', 'Wysyła pytanie do administratora IT'], 1,
+      'Grounding to wyszukiwanie w czasie zapytania w Graphie — nie trenowanie modelu.'],
+    ['Dlaczego Bartek (kontraktor bez dostępu do folderu „Budżet”) nie dostanie liczby budżetu od Copilota, mimo że Ala ją dostaje?',
+      ['Bo Copilot ma inny model dla kontraktorów', 'Bo Copilot respektuje te same uprawnienia, jakie ma pytający w Graphie', 'Bo pytanie Bartka było gorzej sformułowane'], 1,
+      'Copilot działa w uprawnieniach osoby pytającej — nigdy nie pokazuje więcej niż ta osoba i tak widzi.'],
+    ['Co robi Coach by Copilot w Outlooku?',
+      ['Pisze cały mail za Ciebie od zera', 'Ocenia ton i jasność Twojego własnego szkicu', 'Automatycznie wysyła maila po sprawdzeniu'], 1,
+      'Coach czyta Twój szkic i daje informację zwrotną o tonie i jasności — nie pisze za Ciebie (to robi Draft).'],
+    ['Dlaczego fragment transkrypcji z trzema osobami mówiącymi naraz trafia w Teams jako action item oznaczony „niepewny”, zamiast po prostu zniknąć?',
+      ['Bo Copilot zawsze oznacza połowę zadań jako niepewne', 'Bo niska pewność ekstrakcji jest świadomie sygnalizowana zamiast zgadywania właściciela', 'Bo to błąd, który trzeba zgłosić do Microsoftu'], 1,
+      'Copilot woli oznaczyć niepewność niż zgadywać — to zamierzone zachowanie, nie błąd.'],
+    ['Ryzyko ma wpływ 4 i prawdopodobieństwo 3. Jaki jest jego priorytet w typowym RAID logu?',
+      ['7', '12', '1'], 1,
+      'Priorytet = Wpływ × Prawdopodobieństwo = 4 × 3 = 12.'],
+    ['Dlaczego w RAID logu wpływ i prawdopodobieństwo lepiej wpisywać ręcznie niż prosić Copilota o wygenerowanie ich za Ciebie?',
+      ['Bo Copilot nie potrafi wpisywać liczb do Excela', 'Bo to jedna z ocen wymagających ludzkiego osądu, którą łatwo pomylić z faktem', 'Bo formuła priorytetu wymaga liczb całkowitych'], 1,
+      'Wpływ i prawdopodobieństwo to subiektywna ocena ryzyka — model może ją „zgadnąć” w sposób brzmiący pewnie, ale bez podstawy faktycznej.'],
+    ['Zbudowałeś status projektu przez Business Chat, ale wykluczyłeś poniedziałek (byłeś na urlopie). Co się stanie z ryzykiem, o którym pisano tylko w poniedziałek?',
+      ['Copilot i tak je znajdzie z innych dni', 'Zniknie z wygenerowanego statusu — luka w źródłach to luka w wyniku', 'Zostanie zastąpione ogólnym stwierdzeniem "brak ryzyk"'], 1,
+      'Copilot buduje status wyłącznie z dostępnych źródeł — wykluczony dzień to informacja, której po prostu nie ma w wyniku.'],
+    ['Jak Copilot wykrywa sprzeczność w historii komunikacji z interesariuszem?',
+      ['Dzwoni do interesariusza, żeby zapytać wprost', 'Porównuje treść wiadomości w czasie i wskazuje niespójne ustalenia z cytatami', 'Automatycznie anuluje starsze ustalenia'], 1,
+      'Copilot zestawia wiadomości chronologicznie i pokazuje, gdzie treść się rozjeżdża — ocena kontekstu zostaje po stronie PM-a.'],
+    ['Do czego służy funkcja „Utwórz prezentację z pliku” w PowerPoint Copilot?',
+      ['Do generowania obrazków tła dla istniejących slajdów', 'Do budowy szkieletu prezentacji na podstawie dokumentu źródłowego (np. Word)', 'Do automatycznego tłumaczenia prezentacji na inne języki'], 1,
+      'Ta funkcja bierze dokument (np. status w Wordzie) i generuje z niego strukturę slajdów.'],
+    ['Zbudowałeś w Copilot Studio agenta „Status Bot” na swoim koncie z szerokim dostępem do danych. Kto faktycznie decyduje, co agent może pokazać innym?',
+      ['Sam agent, niezależnie od Ciebie', 'Uprawnienia jego twórcy — czyli Twoje', 'Osoba, która akurat z nim rozmawia'], 1,
+      'Agent dziedziczy uprawnienia twórcy. Jeśli masz szeroki dostęp, każdy rozmawiający z Twoim agentem pośrednio z niego korzysta — dlatego dobre agenty ograniczasz do konkretnych, podłączonych źródeł.'],
+    ['Skąd najczęściej biorą się halucynowane liczby, mimo działającego groundingu?',
+      ['Model losuje liczby, gdy nie ma nic lepszego do zrobienia', 'Model łączy fragmenty z dwóch podobnych dokumentów (np. starej i nowej wersji budżetu) w jedno zdanie', 'Grounding jest wyłączony domyślnie i trzeba go włączyć ręcznie'], 1,
+      'Częsty wzorzec: dwa podobne źródła z różnymi wartościami, a model miesza fragmenty obu w płynnie brzmiące, ale niepoprawne zdanie.'],
+    ['Jaka jest najbezpieczniejsza zasada dotycząca automatyzacji wysyłki treści wygenerowanych przez Copilota?',
+      ['Automatyzować tylko zbieranie danych i szkic, nie samą wysyłkę decyzji krytycznych', 'Zawsze wysyłać automatycznie, bo Copilot rzadko się myli', 'Nigdy nie używać Copilota do niczego, co dotyczy budżetu'], 0,
+      'Automatyzacja zbierania i szkicowania oszczędza czas; ostateczna wysyłka decyzji krytycznych (budżet, terminy, komunikacja do zarządu) powinna przejść przez człowieka.'],
+  ];
+  const box = $('#quiz'); let answered = 0, good = 0; const scoreEl = $('#score');
+  function upd() { scoreEl.textContent = `Wynik: ${good} / ${answered}`; }
+  Q.forEach(([q, opts, ok, why], n) => {
+    const d = H('div', 'quiz-q reveal', `<h4>${n + 1}. ${q}</h4><div class="opts"></div><div class="why">💡 ${why}</div>`, box);
+    opts.forEach((t, i) => {
+      const b = H('button', '', t, $('.opts', d));
+      b.onclick = () => {
+        if (d.classList.contains('done')) return;
+        d.classList.add('done'); answered++;
+        if (i === ok) good++; else b.classList.add('wrong');
+        $('.opts', d).children[ok].classList.add('right');
+        $$('button', d).forEach(x => x.disabled = true);
+        upd();
+      };
+    });
+    revealIO.observe(d);
+  });
+})();
+</script>
+</body>
+</html>
