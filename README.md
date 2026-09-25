@@ -39,7 +39,10 @@ Bajty modelu są mapowane po nazwie pliku plus aliasy (`encoder_model*.onnx` →
   animowanych, scrollytellingowych stron wiedzy w stylu „Head First” (jak `cassandra-course.html` czy
   `claude-code-course.html`): plan rozdziałów, weryfikacja faktów w aktualnej dokumentacji, gotowy szablon
   ([`templates/shell.html`](skills/animated-knowledge-page/templates/shell.html)), katalog boxów i typów diagramów,
-  quiz, ściąga, testy headless ([`check-page.cjs`](skills/animated-knowledge-page/scripts/check-page.cjs),
+  quiz, ściąga, dwa tryby (prosty / głęboki z planem i wyborem głębokości), treści wielopoziomowe (części,
+  poziomy L1–L3, przełącznik głębokości, mapa kursu), podwójna walidacja każdej tezy (autor + niezależny weryfikator,
+  [`extract-claims.cjs`](skills/animated-knowledge-page/scripts/extract-claims.cjs)), testy headless
+  ([`check-page.cjs`](skills/animated-knowledge-page/scripts/check-page.cjs),
   [`click-through.cjs`](skills/animated-knowledge-page/scripts/click-through.cjs)) i znane pułapki. Aby używać jej
   wszędzie: `cp -R skills/animated-knowledge-page ~/.claude/skills/`.
 

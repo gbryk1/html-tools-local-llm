@@ -176,6 +176,37 @@ main, footer { overflow-wrap:break-word; }   /* long URLs / identifiers in prose
 .stack { position:relative; height:34px; border:2px solid var(--ink); border-radius:6px; overflow:hidden; background:var(--paper); display:flex; }
 .stack .seg { height:100%; transition:width .7s ease; overflow:hidden; white-space:nowrap; font:700 10.5px/34px var(--sans); color:#fff; text-indent:4px; }
 
+/* ---- multi-level structure: parts, level chips, depth switch, "go deeper", course map ---- */
+.part { margin:5rem 0 0; padding:1.4rem 1.3rem 1.2rem; border-radius:10px; background:var(--ink); color:var(--paper); box-shadow:6px 6px 0 var(--accent2); }
+.part .part-no { font:800 .8rem var(--sans); letter-spacing:.18em; text-transform:uppercase; color:var(--accent2); }
+.part h2 { margin:.2rem 0 .35rem; font-size:clamp(1.7rem,4vw,2.4rem); }
+.part p { margin:0; font-size:1rem; opacity:.85; }
+.lvl-chip { display:inline-block; vertical-align:middle; margin-left:.5rem; font:800 10.5px/1.5 var(--sans); letter-spacing:.06em; text-transform:uppercase; padding:.08rem .5rem; border-radius:999px; color:#fff; background:var(--ok); }
+.lvl-chip.l2 { background:var(--accent); } .lvl-chip.l3 { background:#8e44ad; } .lvl-chip.l4 { background:var(--bad); }
+.lvl-off { display:none !important; }
+details.deeper { border:2px dashed #8e44ad; border-radius:8px; padding:.6rem .9rem; margin:1.8rem 0; background:color-mix(in srgb, #8e44ad 6%, var(--paper2)); }
+details.deeper > summary { font:700 1rem var(--sans); color:var(--ink); }
+details.deeper > summary .lvl-chip { margin:0 .4rem 0 0; }
+details.deeper[open] > summary { margin-bottom:.5rem; }
+.lvl-hint { display:block; width:100%; text-align:left; margin:1.4rem 0 0; font:700 13px var(--sans); color:var(--accent); background:none; border:2px dashed var(--accent); border-radius:8px; padding:.45rem .8rem; cursor:pointer; }
+#depth { position:fixed; left:1rem; bottom:1rem; z-index:45; display:flex; gap:.2rem; align-items:center; font:700 12px var(--sans); background:var(--paper2); color:var(--ink); border:2px solid var(--ink); border-radius:999px; padding:.22rem .3rem .22rem .75rem; box-shadow:3px 3px 0 var(--shadow); opacity:0; pointer-events:none; transition:opacity .4s; }
+body.past-cover #depth { opacity:1; pointer-events:auto; }
+#depth button { font:700 12px var(--sans); border:0; border-radius:999px; padding:.25rem .6rem; background:transparent; color:var(--ink); cursor:pointer; }
+#depth button.on { background:var(--ink); color:var(--paper); }
+@media (max-width:640px) { #depth .nm { display:none; } }
+#toc { max-height:calc(100vh - 5.5rem); overflow-y:auto; }
+.toc-part { font:800 .7rem var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--mut); margin:.8rem 0 .2rem .2rem; }
+#map { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:.7rem; margin:1.5rem 0; }
+.map-part { border:2px solid var(--line); border-radius:10px; padding:.55rem .6rem; background:var(--paper2); }
+.map-part > b { display:block; font:800 11.5px var(--sans); text-transform:uppercase; letter-spacing:.06em; color:var(--mut); margin-bottom:.35rem; }
+.map-ch { display:flex; gap:.45rem; align-items:baseline; font:13px/1.3 var(--sans); color:var(--ink); text-decoration:none; padding:.22rem .4rem; border-radius:6px; border-left:4px solid var(--ok); margin:.15rem 0; transition:background .3s; }
+.map-ch.l2 { border-left-color:var(--accent); } .map-ch.l3 { border-left-color:#8e44ad; } .map-ch.l4 { border-left-color:var(--bad); }
+.map-ch i { font:800 11px var(--mono); font-style:normal; color:var(--mut); min-width:1.4em; }
+.map-ch:hover { background:var(--card); }
+.map-ch.here { background:var(--accent2); color:#1c1c22; font-weight:700; }
+.map-ch.seen::after { content:"✓"; margin-left:auto; color:var(--ok); font-weight:800; }
+.map-ch.dim, #toc a.dim { opacity:.4; }
+
 /* ==== per-figure CSS goes here — prefix every class with the figure name (.ex-…) to avoid collisions ==== */
 .ex-row { display:grid; grid-template-columns:6rem 1fr; gap:.6rem; align-items:center; font:12.5px var(--sans); margin:.4rem 0; }
 /* quiz */
@@ -200,12 +231,8 @@ footer { max-width:800px; margin:0 auto; padding:2rem 1.2rem 4rem; font:14px var
 <body>
 <div id="progress"></div>
 
-<nav id="toc" aria-label="Chapters">
-  <b>Contents</b>
-  <a href="#intro">0 · How to read this</a>
-  <a href="#ch1">1 · {{CHAPTER_1}}</a>
-  <a href="#final">2 · Exam + cheat sheet</a>
-</nav>
+<nav id="toc" aria-label="Chapters"></nav>   <!-- built from parts/chapters by JS -->
+<div id="depth" role="group" aria-label="Reading depth"></div>   <!-- built by JS when any data-level > 1 exists -->
 
 <header class="cover">
   <div class="cover-inner">
@@ -230,17 +257,33 @@ footer { max-width:800px; margin:0 auto; padding:2rem 1.2rem 4rem; font:14px var
 </header>
 
 <main>
+<!-- Structure contract (all optional; a flat page works too):
+     section.part[data-level]      big divider opening a group of chapters (Part I · Foundations)
+     section.chapter[data-level]   data-title = short TOC/map title; empty .chap-num is auto-numbered
+     any block [data-level="2|3"]  hidden when the reader's depth is lower (boxes, paragraphs, figures)
+     details.deeper[data-level]    "go deeper" zoom-in block; its level chip is added automatically
+     #map                          clickable course map (parts × chapters, level colors, ✓ seen, ▶ here)
+     Level names: LEVELS in the script. Default depth = deepest; the reader's choice is remembered. -->
 
-<section class="chapter" id="intro">
-  <div class="chap-head reveal"><div class="chap-num">0</div><div><h2>How to read this guide</h2><span class="tag">{{HANDWRITTEN_SUBTITLE}}</span></div></div>
+<section class="chapter" id="intro" data-title="How to read this">
+  <div class="chap-head reveal"><div class="chap-num"></div><div><h2>How to read this guide</h2><span class="tag">{{HANDWRITTEN_SUBTITLE}}</span></div></div>
   <p class="reveal">{{WHY_MECHANISMS_NOT_FEATURE_LISTS}}</p>
+  <p class="reveal">The guide has levels. Chapters and blocks carry a chip —
+    <span class="lvl-chip">L1</span> essentials, <span class="lvl-chip l2">L2</span> practitioner,
+    <span class="lvl-chip l3">L3</span> expert. Choose your depth with the switch in the bottom-left corner; deeper
+    material hides until you want it. The map below jumps anywhere and ticks off what you've read.</p>
+  <div id="map" class="reveal"></div>
   <div class="box brain reveal"><span class="lbl">🧠 Brain power</span>
     <p>{{OPEN_QUESTION_ANSWERED_IN_THE_FINALE}}</p>
   </div>
 </section>
 
-<section class="chapter" id="ch1">
-  <div class="chap-head reveal"><div class="chap-num">1</div><div><h2>{{CHAPTER_1}}</h2><span class="tag">{{TAG}}</span></div></div>
+<section class="part" id="part-1" data-level="1">
+  <span class="part-no">Part I</span><h2>{{PART_1_NAME}}</h2><p>{{WHAT_THIS_PART_GIVES_YOU}}</p>
+</section>
+
+<section class="chapter" id="ch1" data-level="1" data-title="{{SHORT_TITLE}}">
+  <div class="chap-head reveal"><div class="chap-num"></div><div><h2>{{CHAPTER_1}}</h2><span class="tag">{{TAG}}</span></div></div>
   <p class="reveal">{{PROSE}}</p>
 
   <!-- Example figure: replace. Shows the contract: buttons with data-act, a "break it" action, reset, status line,
@@ -258,19 +301,37 @@ footer { max-width:800px; margin:0 auto; padding:2rem 1.2rem 4rem; font:14px var
     <figcaption>{{WHAT_THE_SIMULATION_SIMPLIFIES — mark invented numbers as illustrative}}</figcaption>
   </figure>
 
+  <div class="box geek reveal" data-level="2"><span class="lbl">🤓 Deep dive</span>
+    <p>{{PRACTITIONER_DETAIL — hidden at depth 1}}</p>
+  </div>
+
+  <details class="deeper" data-level="3">
+    <summary>🔬 Go deeper: {{INTERNALS_TOPIC}}</summary>
+    <p>{{EXPERT_LEVEL_EXPLANATION — may contain its own table, code or small figure}}</p>
+  </details>
+
+  <div class="box bullets reveal"><span class="lbl">📌 Bullet points</span>
+    <ul><li>{{TAKEAWAY}}</li></ul>
+  </div>
+</section>
+
+<section class="part" id="part-2" data-level="2">
+  <span class="part-no">Part II</span><h2>{{PART_2_NAME}}</h2><p>{{WHAT_THIS_PART_GIVES_YOU}}</p>
+</section>
+
+<section class="chapter" id="ch2" data-level="2" data-title="{{SHORT_TITLE}}">
+  <div class="chap-head reveal"><div class="chap-num"></div><div><h2>{{CHAPTER_2}}</h2><span class="tag">{{TAG}}</span></div></div>
+  <p class="reveal">{{PROSE}}</p>
   <div class="box nodumb reveal"><span class="lbl">❓ There are no dumb questions</span>
     <div class="qa">
       <div class="q">Q:</div><div>{{NAIVE_BUT_REAL_QUESTION}}</div>
       <div class="a">A:</div><div>{{ANSWER}}</div>
     </div>
   </div>
-  <div class="box bullets reveal"><span class="lbl">📌 Bullet points</span>
-    <ul><li>{{TAKEAWAY}}</li></ul>
-  </div>
 </section>
 
-<section class="chapter" id="final">
-  <div class="chap-head reveal"><div class="chap-num">2</div><div><h2>Exam + cheat sheet</h2><span class="tag">check what stuck</span></div></div>
+<section class="chapter" id="final" data-title="Exam + cheat sheet">
+  <div class="chap-head reveal"><div class="chap-num"></div><div><h2>Exam + cheat sheet</h2><span class="tag">check what stuck</span></div></div>
   <div id="quiz"></div>
   <div class="score" id="score">Score: 0 / 0</div>
   <h3 class="reveal">Cheat sheet</h3>
@@ -339,6 +400,66 @@ readColors();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
 function ringXY(cx, cy, r, f) { const a = f * 2 * Math.PI - Math.PI / 2; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
 
+/* ---------- structure: auto numbering, TOC, course map, level chips, depth switch ---------- */
+const LEVELS = ['Essentials', 'Practitioner', 'Expert'];   // {{level names}}; data-level = index + 1
+const lvlOf = el => +(el.dataset.level || 1);
+const levelled = (root = document) => $$('main [data-level]', root).filter(e => !e.closest('#map'));   // content, not the map's own links
+const DEPTH_KEY = 'akp-depth:' + location.pathname;
+const blocks = $$('main > section.part, main > section.chapter');
+const chapters = blocks.filter(b => b.classList.contains('chapter'));
+chapters.forEach((s, i) => { const n = $('.chap-num', s); if (n && !n.textContent.trim()) n.textContent = i; });
+const titleOf = s => s.dataset.title || $('h2', s).textContent.trim();
+(() => {
+  const toc = $('#toc'), map = $('#map');
+  if (toc) toc.innerHTML = '<b>Contents</b>';
+  let grp = null;
+  for (const b of blocks) {
+    const lv = lvlOf(b);
+    if (b.classList.contains('part')) {
+      const name = `${$('.part-no', b)?.textContent || ''} · ${$('h2', b).textContent}`;
+      if (toc) H('div', 'toc-part', null, toc).textContent = name;
+      if (map) { grp = H('div', 'map-part', null, map); H('b', '', null, grp).textContent = name; grp.dataset.level = lv; }
+      continue;
+    }
+    const num = $('.chap-num', b)?.textContent || '';
+    if (toc) { const a = H('a', '', null, toc); a.href = '#' + b.id; a.textContent = `${num} · ${titleOf(b)}`; a.dataset.level = lv; }
+    if (map) {
+      if (!grp) { grp = H('div', 'map-part', null, map); H('b', '', null, grp).textContent = 'Start'; }
+      const a = H('a', 'map-ch l' + lv, `<i>${num}</i><span></span>`, grp); a.href = '#' + b.id; a.dataset.level = lv;
+      $('span', a).textContent = titleOf(b);
+    }
+  }
+  const multi = levelled().some(e => lvlOf(e) > 1);
+  // level chips on chapter headings and "go deeper" summaries
+  chapters.forEach(s => { if (multi && s.dataset.level) { const h = $('.chap-head h2', s); if (h) H('span', 'lvl-chip l' + lvlOf(s), `L${lvlOf(s)} · ${LEVELS[lvlOf(s) - 1] || ''}`, h); } });
+  $$('details.deeper').forEach(d => { const sm = $('summary', d); if (sm) sm.insertAdjacentHTML('afterbegin', `<span class="lvl-chip l${lvlOf(d)}">L${lvlOf(d)}</span>`); });
+  // jumping to a chapter deeper than the current depth raises the depth first
+  $$('#toc a, #map a').forEach(a => a.addEventListener('click', () => { if (+a.dataset.level > depth) setDepth(+a.dataset.level); }));
+  const dEl = $('#depth');
+  if (!multi || !dEl) { if (dEl) dEl.remove(); return; }
+  dEl.innerHTML = '<span>Depth</span>';
+  LEVELS.forEach((n, i) => { const b = H('button', '', `${i + 1}<span class="nm"> ${n}</span>`, dEl); b.title = n; b.onclick = () => setDepth(i + 1); });
+})();
+let depth = LEVELS.length;
+try { const d = +localStorage.getItem(DEPTH_KEY); if (d >= 1 && d <= LEVELS.length) depth = d; } catch (e) { }
+function setDepth(d) {
+  depth = d;
+  try { localStorage.setItem(DEPTH_KEY, d); } catch (e) { }
+  levelled().forEach(el => el.classList.toggle('lvl-off', lvlOf(el) > depth));
+  $$('#toc a, #map a, .map-part').forEach(a => a.classList.toggle('dim', lvlOf(a) > depth));
+  $$('#depth button').forEach((b, i) => b.classList.toggle('on', i + 1 === depth));
+  $$('.lvl-hint').forEach(h => h.remove());
+  chapters.forEach(s => {
+    if (s.classList.contains('lvl-off')) return;
+    const hid = levelled(s).filter(e => e.classList.contains('lvl-off'));
+    if (!hid.length) return;
+    const need = Math.min(...hid.map(lvlOf));
+    const b = H('button', 'lvl-hint', `＋ ${hid.length} deeper block${hid.length > 1 ? 's' : ''} hidden here — show level ${need} (${LEVELS[need - 1] || ''})`, s);
+    b.onclick = () => setDepth(need);
+  });
+}
+setDepth(depth);
+
 /* ---------- scroll machinery ---------- */
 const bar = $('#progress');
 let ticking = false;
@@ -362,6 +483,7 @@ const tocIO = new IntersectionObserver(es => es.forEach(e => {
   if (!e.isIntersecting) return;
   tocLinks.forEach(a => a.classList.remove('active'));
   const a = tocLinks.get(e.target.id); if (a) a.classList.add('active');
+  $$('#map a').forEach(m => { const on = m.getAttribute('href') === '#' + e.target.id; m.classList.toggle('here', on); if (on) m.classList.add('seen'); });
 }), { rootMargin: '-35% 0px -60% 0px' });
 $$('section.chapter').forEach(s => tocIO.observe(s));
 

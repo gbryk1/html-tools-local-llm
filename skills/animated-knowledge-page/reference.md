@@ -1,7 +1,8 @@
 # Reference: code patterns for animated knowledge pages
 
-Copy-and-adapt material for the steps in `SKILL.md`. Everything in §1–7 and §9 already exists, working, in
+Copy-and-adapt material for the steps in `SKILL.md`. Everything in §1–7, §9 and §12 already exists, working, in
 [templates/shell.html](templates/shell.html). Copy that file first instead of retyping these snippets.
+§10–11 cover facts and double validation, §13 the deep-mode depth question, §14 browser setup, and §15 parallel authoring.
 
 Worked examples (public repo `gbryk1/html-tools-local-llm`, `src/`):
 - `cassandra-course.html`: distributed-systems internals. Token ring, gossip, Canvas figures, and randomness forced by a button.
@@ -185,7 +186,91 @@ strip "$D/permissions.md" | grep -E '^\| *`'                     # tables of opt
   which contradicted the draft.
 - Write "Facts checked against <source> in <month year>" in chapter 0 and the footer, and point to the product's changelog.
 
-## 11. Browser setup for the headless scripts
+## 11. Double validation protocol
+
+**The ledger.** `scripts/extract-claims.cjs page.html $SCRATCH/claims --split` renders the page at full depth, opens
+every `details`, answers the quiz once so the right options show, and writes one ledger file per chapter:
+
+```
+### C0069 · perm · L1 · tr
+> acceptEdits | Reads, file edits, and common filesystem commands (mkdir, touch, rm, rmdir, mv, cp, sed) … | …
+- pass 1: ✅ code.claude.com/docs/en/permission-modes.md — "auto-approves common filesystem Bash commands: mkdir, touch, rm, rmdir, mv, cp, and sed"
+- pass 2: ✅ permission-modes.md, section acceptEdits — same list; "inside the working directories" confirmed
+```
+
+Verdicts: ✅ confirmed · ⚠️ imprecise (state the fix) · ❌ wrong (state the fix) · ❓ unverifiable (soften or remove) ·
+n/a (pedagogy, opinion, jokes, or numbers already labelled illustrative on the page). A table row is one claim, so every cell must hold.
+
+**Pass 1 (author).** Fill it in from the notes you kept while writing. Every non-n/a claim cites a source and a short quote.
+
+**Pass 2 (independent).** A fresh verifier gets **only** the ledger files, the source list and the downloaded docs
+folder. It doesn't get the author's pass-1 text: strip those lines first, or tell the verifier to ignore them. Prompt:
+
+> You are fact-checking an educational page. For each claim block in the files below, find evidence yourself in these
+> sources: <list / folder>. Do not trust the page or any existing notes. Fill the `- pass 2:` line with a verdict
+> (✅ ⚠️ ❌ ❓ n/a), the evidence location and a short quote. For ⚠️ or ❌, write the corrected wording. Treat every cell of
+> a table row, every flag in a code block, and every number as part of the claim. Mark n/a only for pedagogy, opinion
+> or numbers the page labels illustrative. Return a summary: counts per verdict and the list of non-✅ IDs with fixes.
+
+**Resolve.** Apply the fixes to the page and re-extract. The IDs of unchanged claims may shift, so match on text.
+Carry verdicts over for text that didn't change, and send only new or changed claims to a new verifier. The ship gate:
+
+```bash
+node scripts/extract-claims.cjs --status "$SCRATCH/claims"   # exit 0 + "ALL CLAIMS VALIDATED TWICE"
+```
+
+Keep the ledger in scratch unless the user wants it committed. In the final report, give the claim count, the verdict
+counts from pass 2, and the notable corrections.
+
+## 12. Multi-level structure contract (template)
+
+```html
+<section class="part" id="part-2" data-level="2">                       <!-- divider, dims in TOC/map at lower depth -->
+  <span class="part-no">Part II</span><h2>Extending the tool</h2><p>What this part gives you.</p>
+</section>
+<section class="chapter" id="hooks" data-level="2" data-title="Hooks">  <!-- data-title = TOC/map label -->
+  <div class="chap-head reveal"><div class="chap-num"></div>…</div>     <!-- empty .chap-num → auto-numbered -->
+  …L2 prose and figure…
+  <div class="box geek reveal" data-level="3">…</div>                    <!-- any block can be deeper than its chapter -->
+  <details class="deeper" data-level="3"><summary>🔬 Go deeper: exit-code semantics per event</summary>…</details>
+</section>
+```
+
+- `LEVELS = ['Essentials', 'Practitioner', 'Expert']` names the levels. Add a fourth if the plan needs one; chip colors exist up to `l4`.
+- The depth switch (bottom-left, shown after the cover) hides `[data-level] > depth`. The choice persists per page in
+  `localStorage`. The default is the deepest level, so nothing is hidden on a first visit or for the checkers.
+- Every chapter with hidden blocks gets a "＋ N deeper blocks hidden — show level K" button. Clicking a dimmed TOC or map
+  entry raises the depth automatically.
+- `#map` (put it in chapter 0) is the course overview. It shows parts as cards and chapters with level-colored borders,
+  marks the current chapter with ▶, adds ✓ for chapters already seen, and is the mobile navigation (the TOC shows only at ≥1440px).
+- The TOC is built from the DOM. Don't hand-write it.
+- A flat page: omit the parts and `data-level`, and the switch and chips disappear by themselves.
+- Writing rule: each level must read complete without the levels above it. L2 and L3 add depth; they never fill gaps in L1.
+
+## 13. Deep mode: asking how deep
+
+Propose **cumulative** tiers built from the step-1 survey, and let previews show the actual chapters:
+
+```json
+{"questions":[
+ {"header":"Depth","question":"How deep should the guide go? Each tier includes the previous ones.","multiSelect":false,
+  "options":[
+   {"label":"Essentials","description":"Mental model + daily use (≈6 chapters)","preview":"Part I · Foundations\n 1 What it is: the loop\n 2 First session\n 3 Context\nPart II · Daily use\n 4 Memory\n 5 Permissions\n 6 Plan → code → verify"},
+   {"label":"+ Practitioner (Recommended)","description":"Adds the extension layer (≈11)","preview":"…Essentials, plus\nPart III · Extending\n 7 Skills\n 8 Subagents\n 9 Hooks\n10 MCP & plugins\n11 Sessions & rewind"},
+   {"label":"+ Expert","description":"Adds scale, automation, internals (≈16)","preview":"…Practitioner, plus\nPart IV · Expert\n12 Parallel work\n13 Headless & CI\n14 Models & cost\n15 Internals deep dives (L3)\n16 Habits & anti-patterns"},
+   {"label":"+ Everything","description":"Adds edge cases, ops, comparisons (≈20+)","preview":"…Expert, plus\nPart V · Mastery\n17 Troubleshooting\n18 Security model\n19 Team rollout\n20 Alternatives compared"}]},
+ {"header":"Extras","question":"Which extras should be included?","multiSelect":true,
+  "options":[
+   {"label":"Hands-on exercises","description":"✏️ tasks with answers in every chapter"},
+   {"label":"Go-deeper blocks","description":"🔬 L3 internals inside chapters"},
+   {"label":"Troubleshooting","description":"symptom → cause → fix tables"},
+   {"label":"Comparisons","description":"vs alternatives, when to choose which"}]}]}
+```
+
+Map the choice to levels: the tiers become the parts, and the tier a chapter first appears in is usually its
+`data-level`. Then write `<page>.plan.md` and get the user's approval on a compact outline before building.
+
+## 14. Browser setup for the headless scripts
 
 `scripts/_browser.cjs` finds `playwright-core` (local, `NODE_PATH`, global, or OpenClaw-bundled) and a browser.
 It tries `CHROME_PATH` first, then Playwright's downloaded Chromium, then an installed Chrome, Chromium or Edge.
@@ -213,3 +298,22 @@ export LD_LIBRARY_PATH=/tmp/libs/root/usr/lib/x86_64-linux-gnu FONTCONFIG_FILE=/
 
 The package names are for Ubuntu 24.04+ (with `t64` suffixes). If Chromium still fails, run `ldd` on the
 headless-shell binary and download whatever reports `not found`.
+
+## 15. Parallel authoring contract (large deep-mode pages only)
+
+Use this after the plan is approved and the shell is filled (tokens, helpers, structure, quiz scaffolding).
+
+- Split the plan by part. Author N owns `$SCRATCH/parts/part-N.html` (only `section.part` and `section.chapter` elements),
+  `part-N.js` (only figure IIFEs, each preceded by `/* ---------- <n>. <name> ---------- */`) and `part-N.css`
+  (every class prefixed `pN-`). Authors never edit the shell, and never touch another author's files.
+- Give each author the SKILL.md steps 5–7, reference §3–8 and §12, the plan excerpt for their part, the facts/sources
+  sheet, and the helper API list (§5). Ask for pass-1 notes (claim → source → quote) alongside their files.
+- Assemble the page yourself: insert the CSS into the per-figure slot, the HTML into `main` before the final chapter,
+  and the JS before the quiz. Run `node --check`, `check-page.cjs` and `click-through.cjs`, then the validation loop (§11).
+  Screenshot fixes stay with you, because layout is shared.
+- Prompt skeleton:
+
+  > Write Part <N> of an animated knowledge page. Output exactly three files: <paths>. Follow the attached
+  > contract: element types, level attributes, prefixed classes, one figure per mechanism chapter with a break-it
+  > action and a reset, and a `.status` narration per step. Use only these helpers: <list>. Every factual claim must
+  > come from the attached sources. Return a notes file with claim → source → quote. Don't invent flags, defaults or numbers.

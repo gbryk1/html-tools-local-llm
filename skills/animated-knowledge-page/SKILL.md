@@ -1,124 +1,172 @@
 ---
 name: animated-knowledge-page
-description: "Build an animated course, interactive guide, scrollytelling explainer or 'from zero to expert' knowledge page (\"animowany kurs\", \"strona wiedzy\", \"przewodnik\", Head First style) on one technical topic, tool or product. Produces a single self-contained HTML file with scroll-triggered SVG/HTML/Canvas diagrams, Head First boxes, a quiz and a cheat sheet, fact-checked against current docs and verified headless."
+description: "Build an animated course, interactive guide, scrollytelling explainer or 'from zero to expert' knowledge page (\"animowany kurs\", \"strona wiedzy\", \"przewodnik\", Head First style) on one technical topic, tool or product. Two modes: simple (build what was asked) and deep (plan first, user picks how deep, multi-level content). Produces a single self-contained HTML file with scroll-triggered SVG/HTML/Canvas diagrams, Head First boxes, a quiz and a cheat sheet. Every claim is validated twice (by the author against sources, then by an independent verifier), and the page is verified headless."
+argument-hint: "[simple|deep] <topic>"
 ---
 
 # Animated Knowledge Page
 
-Builds one self-contained `.html` file that teaches a single technical concept, system or tool through
-scroll-triggered, clickable diagrams and Head First-style prose. Examples: "how Cassandra works inside",
-"Claude Code from zero to expert", "Copilot for project managers".
+Builds one self-contained `.html` file that teaches a concept, system or tool through scroll-triggered, clickable
+diagrams and Head First-style prose. The content can be flat or multi-level (parts → chapters → deeper blocks), and
+the reader picks a reading depth.
 
-- Starter page with the design system, helpers, scroll machinery, an example figure and the quiz: [templates/shell.html](templates/shell.html)
-- Patterns, box catalogue, figure archetypes, fact-check workflow, browser setup: [reference.md](reference.md)
-- Headless checks: [scripts/check-page.cjs](scripts/check-page.cjs) (smoke test) and [scripts/click-through.cjs](scripts/click-through.cjs) (clicks every control)
+| File | What it is |
+|---|---|
+| [templates/shell.html](templates/shell.html) | Starter page: design system, parts/levels/depth switch/course map, helpers, an example figure, and the quiz |
+| [reference.md](reference.md) | Patterns, box catalogue, figure archetypes, multi-level contract, validation protocol, subagent contracts, browser setup |
+| [scripts/check-page.cjs](scripts/check-page.cjs) | Smoke test: light, dark, mobile, reduced motion, and depth 1 |
+| [scripts/click-through.cjs](scripts/click-through.cjs) | Clicks every control and fails on any JS error |
+| [scripts/extract-claims.cjs](scripts/extract-claims.cjs) | Builds the claims ledger for double validation; `--status` is the ship gate |
+
+## Two modes
+
+Take the mode from the arguments or the request ("quick", "simple" → simple; "deep", "thorough", "complete guide",
+"zero to expert" → deep). If it's unclear, ask once with AskUserQuestion: **Simple** — "build what I asked, now",
+or **Deep** — "plan first, choose the depth, multi-level".
+
+| | Simple | Deep |
+|---|---|---|
+| Scope | exactly what the user asked for | proposed by you, and the user chooses how deep |
+| Plan | internal, not shown | a written plan, shown and approved before building |
+| Structure | flat chapters (levels optional) | parts → chapters → levels L1/L2/L3 (+ "go deeper" blocks) |
+| Validation | **double**: author + independent verifier | **double**, with parallel verifiers when the ledger is large |
+| Subagents | usually none, except the pass-2 verifier | research fan-out, verifiers, and optionally chapter authors (see Parallel work) |
+
+There is **no chapter limit** in either mode. Each chapter explains one mechanism, and the topic decides how many chapters there are.
 
 ## Hard constraints
 
-- One HTML file: inline `<style>` and inline `<script>`, vanilla JS, SVG, HTML and `<canvas>`. No framework, no bundler, no build step.
-- No network dependencies. Use system font stacks and emoji as icons. Use a CDN only if a library is truly unavoidable, and pin its version.
-- Light and dark themes come from `prefers-color-scheme` on CSS variables. There must be no horizontal page overflow at 390px.
-  Under `prefers-reduced-motion`, every animation is instant but still shows its end state.
-- The page is readable without JS (`.reveal` only hides content when `html.js` is set) and without the scroll animations.
-- Be honest. Every figcaption says what the simulation simplifies, and invented numbers are labelled "illustrative" or "heuristic".
+- One HTML file: inline `<style>` and `<script>`, vanilla JS, SVG, HTML and Canvas. No framework, no build step, no network dependencies.
+- Light and dark themes come from `prefers-color-scheme`. There must be no horizontal overflow at 390px. Reduced motion shows the end
+  states. The page is readable without JS. On multi-level pages, depth 1 must also be clean.
+- **Nothing ships unvalidated.** Every factual claim (text, tables, code, captions, quiz, figure narrations) passes
+  two independent checks. Invented numbers are labelled "illustrative" on the page, and each figcaption says what the simulation simplifies.
 
 ## Steps
 
-0. **Decide the frame.** Write the page in the language of the user's request, unless the user or project says
-   otherwise, and write any repo index or README entry in the repo's own language. Decide the audience level and the
-   arc: one mechanism deep, or zero → expert across a whole tool. Find where the page will live: the repo's pages or
-   docs folder, how the index links pages, and whether a generator copies sources. If there is no repo, put the file
-   in the working directory.
-   Done when you know the language, the audience, the target path and the ship steps.
+0. **Frame.** Pick the mode (above). Write in the language of the user's request unless told otherwise, and write any
+   repo index or README entry in the repo's language. Find the target path and the ship conventions: the pages folder,
+   the index, and any generator that copies sources. If there is no repo, use the working directory.
+   Done when you know the mode, language, audience, target path and ship steps.
 
-1. **Plan the syllabus before writing code.** List 8–18 chapters. Each chapter covers one mechanism and uses only earlier
-   chapters. For a zero → expert guide, group the chapters into stages: mental model → daily use → extension layer →
-   expert layer. For each chapter write:
-   - the one-sentence takeaway,
-   - the misconception it kills,
-   - the figure that *demonstrates the mechanism itself* (reference §8): what the reader clicks, what moves,
-     what state changes, the "break it" action, and the reset.
+1. **Survey the sources.** Find the authoritative sources: official docs (download `llms.txt` and markdown pages into
+   scratch; reference §10), specs, source code, papers. In deep mode, map the whole topic landscape here, because you
+   can't propose depth tiers for what you haven't surveyed.
+   Done when you have a list of the source files or URLs and a topic map.
 
-   Add chapter 0 ("how to read this", ending in an open 🧠 question that the finale answers) and a final chapter
-   (quiz + cheat sheet). For tool guides, plan an **Option | What | When** table in each chapter that has options.
-   Done when every chapter has a takeaway, a figure spec with at least one user action, and at least one box type.
+2. **Scope.**
+   - *Simple:* list the chapters that cover the request (one mechanism each, in dependency order), each with its
+     takeaway, the misconception it kills, a figure spec (what the reader clicks, what changes, the break-it action,
+     the reset) and its boxes. Don't show this to the user; continue.
+   - *Deep:* **ask how deep to go**, with AskUserQuestion and cumulative tiers (reference §13). Each option's
+     `preview` lists the parts and chapters that tier adds, for example:
+     1. Essentials,
+     2. + Practitioner,
+     3. + Expert / internals,
+     4. + Edge cases, operations and comparisons.
 
-2. **Check the facts** (reference §10). Defaults, thresholds, formulas, flags, file paths, command names and
-   version-dependent *behavior* all need checking. For fast-moving products, download the official docs as markdown
-   into scratch and grep them. Don't trust memory. Record the date you checked, for chapter 0 and the footer.
-   Done when every command, number and behavior in the planned cheat sheet has a source you checked.
+     Add a second multi-select question for optional extras, such as hands-on exercises, a troubleshooting part,
+     comparisons with alternatives, or internals deep dives. Then write the **plan** to scratch as `<page>.plan.md`:
+     parts → chapters → level (L1/L2/L3) → takeaway, misconception, figure spec, boxes, "go deeper" blocks, the
+     claims each chapter will make with their sources, and the quiz topics. Show a compact outline and ask the user to
+     approve or adjust it. **Don't build before approval.**
 
-3. **Start from the shell.** Copy `templates/shell.html` to the target path. Fill in `{{…}}`, the TOC, the cover
-   icons and the chapter skeletons. Keep the design tokens and helpers. Add per-figure CSS only in the marked slot,
-   with **prefixed class names**, and grep the CSS before you introduce a short name like `.sub` or `.card`.
-   Done when the page with its cover, TOC and empty chapters renders in light and dark.
+   Done when (simple) every chapter has a figure spec, or (deep) the user has approved the plan.
 
-4. **Write chapters: prose + boxes.** Use conversational second person, short paragraphs with one idea each, and humor
-   that serves the point. Each chapter gets 1–3 boxes (reference §3): 🧠, ❓, ✏️, 🔥, ⚠️, 🤓, 🧰, 😌, and a 📌 summary
-   at the end. Show real snippets: config files, commands, frontmatter. Mark text blocks `.reveal`.
-   Done when every chapter ends with a 📌 summary or a ✏️ exercise, and no chapter is only prose.
+3. **Validation pass 1: the author, while writing** (reference §11). Check every command, flag, default, number, path
+   and *behavior* against a source *before* it goes into the page. Keep notes (claim → source → quote) in the plan or
+   in scratch. Anything you can't source gets softened into a clearly-marked opinion, or dropped.
+   Done when every planned claim has a source.
 
-5. **Build one figure per chapter** (reference §4–8).
-   - Use one IIFE per figure with local state, registered with `registerFig(el, {first, enter, leave})`. `first()`
-     plays an auto-demo once. `enter/leave` start and stop loops.
-   - Write mechanisms as `await` sequences, with a `.status` sentence for each step saying what happened and why.
-   - Every figure has buttons (`data-act`), at least one "break it" action, and `↺ Reset`. Serialize clicks with
-     `makeQueue()`, and cancel stale runs with a `runId`. Each action starts from a state that matches its narration.
-   - Prefer HTML-grid figures (bars, cards, logs, timelines) when geometry doesn't matter, because they reflow on mobile.
-     SVG uses `viewBox`. Put a wide SVG in `.scroll-x`. Use `wbr()` for CamelCase labels in narrow grids.
-   - Use deterministic data. Add a button for any rare random case the text relies on.
-   - Build large pages in parts: head, CSS, chapter HTML in 2–3 files, and JS. Concatenate them into the target, then
-     extract the `<script>` and run `node --check` before opening a browser.
-   Done when every figure animates on first view, responds to each button, and resets cleanly.
+4. **Start from the shell.** Copy `templates/shell.html` to the target and fill in the `{{…}}` placeholders.
+   Multi-level content uses the structure contract (reference §12): `section.part[data-level]`,
+   `section.chapter[data-level][data-title]`, `[data-level]` blocks, `details.deeper`, `#map` and `LEVELS`. The TOC,
+   chapter numbers, level chips and course map are generated for you. For a flat page, delete the parts and the
+   level attributes, and the depth switch disappears. Per-figure CSS goes in the marked slot, with **prefixed class names**.
 
-6. **Finish with the quiz and cheat sheet.** Write 10–14 questions in the `[question, options, correctIndex, why]`
-   array. The wrong options are the chapters' misconceptions. The cheat sheet has the columns
-   parameter/command | default/what | when. Close the loop in the 🎓 box: answer chapter 0's question and give one next step.
-   Done when every chapter is covered by at least one question or cheat-sheet row.
+5. **Write the chapters: prose and boxes.** Use conversational second person, one idea per paragraph, and humor that
+   serves the point. Each chapter gets 1–3 boxes (reference §3) and ends with a 📌 summary or ✏️ exercise. Tool
+   guides get **Option | What | When** tables. Expert material goes into L2/L3 blocks or `details.deeper`, so a
+   beginner can read at depth 1 without gaps: never make an L1 chapter depend on L2 content.
 
-7. **Verify headless** (reference §11 for browser setup). Scripts live next to this file. Put screenshots in scratch,
-   not in the repo.
+6. **Build one figure per mechanism chapter** (reference §4–8). Use an IIFE with `registerFig(el,{first,enter,leave})`,
+   `await` sequences with one `.status` sentence per step, buttons with `data-act`, a break-it action, `↺ Reset`,
+   `makeQueue()` and a `runId`. Each action starts from the state its narration assumes. Prefer HTML-grid figures on
+   mobile. Use deterministic data. Build large pages in parts, concatenate them, and run `node --check` on the script.
+
+7. **Quiz and cheat sheet.** Write one or more questions per chapter, where the wrong options are the chapter's
+   misconceptions, and tag deeper-level questions in the text ("(L3)"). The cheat sheet has the columns
+   parameter/command | default/what | when. The 🎓 box answers chapter 0's question.
+
+8. **Validation pass 2: independent verification** (reference §11). Extract the ledger:
    ```bash
-   node <skill-dir>/scripts/check-page.cjs  path/to/page.html "$SCRATCH/shots"   # light/dark/mobile/reduced
-   node <skill-dir>/scripts/click-through.cjs path/to/page.html "$SCRATCH/shots"  # every button, select, checkbox
+   node <skill-dir>/scripts/extract-claims.cjs page.html "$SCRATCH/claims" --split   # one file per chapter
    ```
-   - `check-page.cjs` fails on JS errors, figures that never animate, and horizontal overflow, and it lists the offenders.
-   - `click-through.cjs` fails on any JS error after clicking every control.
-   - Then **open the screenshots** and look for overlapping labels, clipped text, mid-word breaks, dark-mode
-     contrast problems, and narration that contradicts the visible state. Plan at least two screenshot → fix rounds.
+   Fill in `pass 1` for every claim from your notes. Then have **someone who didn't write the page** fill in
+   `pass 2`: a fresh verifier subagent that gets only the ledger files and the source list, never your notes or
+   your reasoning. It re-finds evidence itself and marks each claim ✅ / ⚠️ / ❌ / ❓ / n/a. Fix every ⚠️, ❌ and ❓ in
+   the page, then **re-verify only the changed claims** with a new verifier. Loop until:
+   ```bash
+   node <skill-dir>/scripts/extract-claims.cjs --status "$SCRATCH/claims"   # must print ALL CLAIMS VALIDATED TWICE
+   ```
+   If subagents aren't available, do pass 2 yourself as a separate, source-first sweep: for each claim, find the
+   evidence again without looking at your pass-1 note.
 
-   Done when both scripts pass and every figure's screenshot was inspected after the last layout change.
+9. **Verify headless** (reference §14 for browser setup):
+   ```bash
+   node <skill-dir>/scripts/check-page.cjs   page.html "$SCRATCH/shots"   # light/dark/mobile/reduced (+depth1)
+   node <skill-dir>/scripts/click-through.cjs page.html "$SCRATCH/shots"   # every control, no JS errors
+   ```
+   Then **look at the screenshots**. Check for overlapping labels, clipped text, mid-word breaks, dark-mode contrast,
+   narration that contradicts the visible state, and on multi-level pages, depth 1 reading well. Plan at least two
+   screenshot → fix rounds. Re-run step 8 `--status` if any text changed.
 
-8. **Ship.** Follow the conventions found in step 0:
-   - Keep the source where the generator won't wipe it, and register it wherever the generator needs it.
-   - If the generator can't run (for example because of missing large inputs), copy the page by hand and patch the
-     generated index the same way as its template.
-   - Link the page from the index and the README.
-   - Commit, and push if that's the repo's workflow. Run the commit or push as a command of its own, never chained after cleanup.
+10. **Ship.** Follow the conventions from step 0: keep the source where generators won't wipe it, register it, link it
+    from the index and README, and commit (and push if that's the workflow) as a command of its own. Report to the user:
+    - the mode and depth,
+    - the chapter and figure counts,
+    - validation results (claims, how many passes, what was fixed),
+    - the check results.
 
-   Done when the page is reachable from the index and the commit exists (on the remote, if pushed).
+## Parallel work: subagents only when they pay off
+
+Spawning costs context and coordination. Use subagents for these:
+
+- **Pass-2 verifier: always**, even for a small page. Independence is the point, not speed. When the ledger has more
+  than ~150 claims, run one verifier per part or per group of chapter files, in parallel.
+- **Research fan-out (deep mode):** when there are 5 or more independent source areas (for example settings, hooks,
+  MCP and CI docs), use one subagent per area. Each returns a fact sheet of claim → source → quote. This keeps raw
+  docs out of your context.
+- **Parallel chapter authoring:** only for large deep-mode pages, around 12 or more chapters, and only after the plan
+  and shell are fixed. Each author owns separate files: `part-N.html` (sections), `part-N.js` (figure IIFEs) and
+  `part-N.css` (classes prefixed `pN-`). Authors get the shell contract and the plan excerpt, and return pass-1
+  notes. You assemble the page and run all checks. See reference §15 for prompts.
+
+Don't use subagents for:
+- simple-mode authoring,
+- small pages,
+- visual QA fixes (they share layout),
+- anything that needs the user's answers.
 
 ## Pitfalls
 
-- **Stale facts about fast-moving tools.** The draft said `acceptEdits` auto-approves only `mkdir/touch/mv/cp`, but the docs
-  said `rm`, `rmdir` and `sed` too. Commands get removed and renamed, and defaults change per model. Grep the docs for every claim.
-- **Blank screenshots / Chromium crashes on `<input>`/`<select>`.** The sandbox had no fonts. A "no JS errors" run with blank
-  screenshots is not a pass (reference §11).
-- **Missing Chromium libraries, or a browser tool refusing `localhost`.** Use `playwright-core` with `file://` URLs. No server is needed.
-- **`pkill -f "http.server 8731"` killed its own command** (exit 144), because the pattern matched its own shell. Kill by PID
-  or use a bracket pattern, and never chain cleanup with commit or push.
-- **Layout collisions only show up in screenshots.** Ring labels collided, a label covered a node, and the fixed TOC
-  overlapped the cover. Put labels on a larger radius than nodes, reserve space for badges, and stack exploded labels
-  in a column rather than scattering them.
-- **Generic class names collide.** A figure's `.sub` class also matched the cover subtitle `.sub` and `.ctx-bar.sub`.
-- **Mobile overflow.** Check the overflow list:
-  - grid items need `min-width:0`,
-  - long `<select>` options need `max-width:100%`,
-  - long unbreakable text in prose needs `overflow-wrap:break-word`. Here the list is empty but `scrollWidth` > 390.
-- **CamelCase labels break mid-word** (`SessionStar|t`) in narrow grids. Insert `<wbr>` between words.
-- **`hidden` attribute ignored.** `.ctrl{display:flex}` beats the UA `[hidden]` rule, so the template forces it.
-- **Narration contradicts state.** A second "break it" action ran on the state the first one left behind. Reset first.
-- **Rare random cases look like bugs.** A 13% event was missed by the tests. Force it with a button or seed the demo.
-- **Dynamic text grammar.** Interpolated counts need plural rules (Polish: 1 replika / 2–4 repliki / 5+ replik).
-- **Dynamically created `.reveal` elements** (quiz questions) stay invisible unless passed to `revealIO.observe()`.
-- **Checker false positives.** `<code>` inside `<pre>` sits past the viewport but scrolls inside its block. The checker ignores `pre` and `.scroll-x`.
+- **Stale facts about fast-moving tools.** The draft said `acceptEdits` auto-approves only `mkdir/touch/mv/cp`, but the docs say
+  `rm`, `rmdir` and `sed` too. Verify behavior, not only numbers, and have the verifier re-find the evidence itself.
+- **Self-verification bias.** Re-reading your own notes confirms your own mistakes. Pass 2 must start from the page text and the sources.
+- **Claims hide in JS.** Status narrations and scenario texts appear only after clicks. `extract-claims.cjs` reads the
+  script's string literals, attributed to the nearest `/* ---------- N. name ---------- */` comment. Keep that
+  comment style.
+- **Levels leaking.** An L1 chapter that uses an L2-only term breaks depth-1 reading. Define terms at the lowest level
+  that uses them. `check-page.cjs` runs depth 1, but only your reading catches gaps in meaning.
+- **Blank screenshots / Chromium crashes** in a font-less sandbox. A "no JS errors" run with blank screenshots is not a pass (reference §14).
+- **`pkill -f` matched its own shell** and killed a chained commit. Kill by PID, and never chain cleanup with commit or push.
+- **Layout collisions only show up in screenshots.** Put labels on a larger radius than nodes, reserve space for badges,
+  and stack exploded labels in a column.
+- **Generic class names collide** (`.sub` matched the cover subtitle). Prefix per-figure classes.
+- **Mobile overflow.** Grid items need `min-width:0`, `<select>` needs `max-width:100%`, and long unbreakable text needs `overflow-wrap`.
+- **CamelCase labels break mid-word** in narrow grids. Use `wbr()`.
+- **`hidden` is ignored** under `display:flex` rules. The template forces `[hidden]{display:none!important}`.
+- **Narration contradicts state** after a second break-it action. Reset first.
+- **Rare random cases look like bugs.** Force them with a button or seed the demo.
+- **Plural rules** for interpolated counts (Polish: 1 replika / 2–4 repliki / 5+ replik).
+- **Dynamically created `.reveal` elements** need `revealIO.observe()`.

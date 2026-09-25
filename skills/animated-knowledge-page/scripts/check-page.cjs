@@ -1,7 +1,8 @@
 // Headless smoke test for an animated knowledge page.
 // Usage: node check-page.cjs <page.html> [outDir=./shots]
+// Runs: light 1400px, dark, mobile 390px, reduced motion, and (multi-level pages) depth 1 on mobile.
 // Browser discovery: see _browser.cjs (CHROME_PATH, Playwright's Chromium, or an installed Chrome).
-// In a lib-less Linux sandbox export LD_LIBRARY_PATH and FONTCONFIG_FILE first (reference.md §9).
+// In a lib-less Linux sandbox export LD_LIBRARY_PATH and FONTCONFIG_FILE first (reference.md §14).
 const path = require('path');
 const fs = require('fs');
 const { launch } = require('./_browser.cjs');
@@ -13,7 +14,7 @@ const url = 'file://' + file;
 const WAIT = +process.env.FIG_WAIT_MS || 4000; // longer than the slowest first() delay
 let failed = false;
 
-async function run(browser, name, opts, shots) {
+async function run(browser, name, opts, shots, depth1 = false) {
   const p = await browser.newPage(opts);
   const errs = [];
   p.on('pageerror', e => errs.push('pageerror: ' + e.message));
@@ -32,7 +33,10 @@ async function run(browser, name, opts, shots) {
     });
   });
   await p.goto(url);
-  const ids = await p.evaluate(() => Object.keys(window.__mut));
+  // Multi-level pages: optionally switch the reader depth to 1 (essentials) before checking.
+  if (depth1) await p.evaluate(() => { const b = document.querySelector('#depth button'); if (b) b.click(); });
+  // Only figures that are displayed at the current depth are expected to animate.
+  const ids = await p.evaluate(() => Object.keys(window.__mut).filter(id => document.getElementById(id).offsetParent !== null));
   const dead = [];
   for (const id of ids) {
     await p.evaluate(id => document.getElementById(id).scrollIntoView({ block: 'center' }), id);
@@ -74,6 +78,10 @@ async function run(browser, name, opts, shots) {
   await run(browser, 'dark', { viewport: { width: 1400, height: 900 }, colorScheme: 'dark' }, false);
   await run(browser, 'mobile', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, true);
   await run(browser, 'reduced', { viewport: { width: 1000, height: 800 }, reducedMotion: 'reduce' }, false);
+  // Multi-level page: essentials-only reading must also be clean (no errors, no overflow, no dead figures).
+  const probe = await browser.newPage(); await probe.goto(url);
+  const hasDepth = await probe.evaluate(() => !!document.querySelector('#depth button')); await probe.close();
+  if (hasDepth) await run(browser, 'depth1', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, false, true);
   await browser.close();
   console.log(failed ? 'FAIL' : 'OK', '— screenshots in', out);
   process.exit(failed ? 1 : 0);
