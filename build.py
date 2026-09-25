@@ -35,6 +35,7 @@ WHISPER_FILES = [
     "decoder_model_merged_quantized.onnx",
 ]
 CHAT_FILES = ["model_q4f16.onnx"]
+STATIC_PAGES = ["cassandra-course.html"]  # plain pages without models, copied verbatim
 CHAT_PART_CHARS = 52_428_800  # ~50 MiB of base64 per part (multiple of 4)
 
 
@@ -105,6 +106,8 @@ def main() -> None:
 
     stt = build_stt(args.repo_url, stamp)
     chat = build_chat(args.repo_url, stamp)
+    for name in STATIC_PAGES:
+        shutil.copyfile(SRC / name, OUT / name)
 
     total = sum(f.stat().st_size for f in OUT.iterdir() if f.is_file())
     index = (SRC / "index.template.html").read_text(encoding="utf-8")

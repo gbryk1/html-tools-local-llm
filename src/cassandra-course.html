@@ -1,0 +1,2426 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cassandra od środka — animowany kurs w stylu Head First</title>
+<meta name="description" content="Animowany kurs wewnętrznej architektury i zasad designu Apache Cassandra: pierścień tokenów, vnodes, gossip, ścieżki zapisu i odczytu, tunable consistency, kompakcja, tombstones, drzewa Merkle, modelowanie danych.">
+<script>document.documentElement.classList.add('js')</script>
+<style>
+:root {
+  color-scheme: light dark;
+  --paper:#fbf8f1; --paper2:#ffffff; --ink:#1c1c22; --mut:#5d5f6b; --line:#d9d3c4; --shadow:#1c1c22;
+  --accent:#1b6fa8; --accent2:#e39b2d; --ok:#2f9e63; --bad:#d64545; --warn:#c98a00;
+  --pen:#b8431f; --note:#fff4c2; --card:#f1ece0; --code:#f3efe6; --dim:#9aa0ab;
+  --hand:"Segoe Print","Bradley Hand","Comic Neue","Comic Sans MS","Chalkboard SE","Marker Felt",cursive;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --serif:Charter,"Bitstream Charter","Iowan Old Style",Georgia,"Palatino Linotype",serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --paper:#15171c; --paper2:#1d2027; --ink:#e7e5df; --mut:#a3a6b1; --line:#383c49; --shadow:#000;
+          --accent:#5aa9e6; --accent2:#f0b34f; --ok:#4cc38a; --bad:#f06b6b; --warn:#f0c040;
+          --pen:#ff9a6b; --note:#3a3420; --card:#232730; --code:#22262e; --dim:#5d6270; }
+}
+* { box-sizing:border-box; }
+[hidden] { display:none !important; }
+html { scroll-behavior:smooth; }
+body { margin:0; background:var(--paper); color:var(--ink); font:18px/1.68 var(--serif); }
+a { color:var(--accent); }
+code, kbd { font:.86em var(--mono); background:var(--code); padding:.08em .35em; border-radius:4px; }
+pre { font:14px/1.5 var(--mono); background:var(--code); border-left:4px solid var(--accent); padding:.9rem 1rem; overflow:auto; border-radius:4px; }
+pre code { background:none; padding:0; font-size:inherit; }
+h1,h2,h3,h4 { font-family:var(--sans); line-height:1.2; }
+h3 { font-size:1.28rem; margin:2.2rem 0 .6rem; }
+strong, b { font-weight:700; }
+.hand { font-family:var(--hand); color:var(--pen); }
+.mut { color:var(--mut); }
+
+/* progress + toc */
+#progress { position:fixed; inset:0 0 auto 0; height:5px; background:linear-gradient(90deg,var(--accent),var(--accent2)); transform-origin:0 50%; transform:scaleX(0); z-index:50; }
+#toc { position:fixed; top:1.4rem; left:1rem; width:205px; font:13.5px/1.35 var(--sans); z-index:40; display:none; opacity:0; pointer-events:none; transition:opacity .4s; }
+body.past-cover #toc { opacity:1; pointer-events:auto; }
+#toc b { display:block; font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--mut); margin-bottom:.5rem; }
+#toc a { display:block; padding:.28rem .55rem; border-left:3px solid var(--line); color:var(--mut); text-decoration:none; }
+#toc a:hover { color:var(--ink); }
+#toc a.active { border-color:var(--accent2); color:var(--ink); font-weight:700; background:var(--card); }
+@media (min-width:1440px) { #toc { display:block; } }
+
+/* cover */
+.cover { min-height:96vh; display:grid; place-items:center; padding:3rem 1.2rem; position:relative; overflow:hidden;
+         background:radial-gradient(circle at 70% 30%, color-mix(in srgb, var(--accent2) 18%, transparent), transparent 55%), var(--paper); }
+.cover-inner { max-width:1040px; width:100%; display:grid; gap:2rem; grid-template-columns:1fr; align-items:center; }
+@media (min-width:900px) { .cover-inner { grid-template-columns:1.1fr .9fr; } }
+.cover .kicker { font:700 .85rem var(--sans); letter-spacing:.2em; text-transform:uppercase; color:var(--accent); }
+.cover h1 { font-size:clamp(2.6rem,6vw,4.6rem); margin:.3rem 0 .6rem; letter-spacing:-.02em; }
+.cover h1 span { display:inline-block; background:var(--ink); color:var(--paper); padding:0 .25em; transform:rotate(-1.5deg); }
+.cover .sub { font-size:1.2rem; color:var(--mut); max-width:34em; }
+.cover .stamp { display:inline-block; margin-top:1.2rem; font:700 1rem var(--hand); color:var(--pen); border:3px solid var(--pen); padding:.3rem .8rem; border-radius:8px; transform:rotate(-4deg); }
+.cover svg { width:100%; max-width:430px; justify-self:center; overflow:visible; }
+.spin { animation:spin 60s linear infinite; transform-origin:200px 200px; }
+.spin-rev { animation:spin 90s linear infinite reverse; transform-origin:200px 200px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.cover .scroll-hint { position:absolute; bottom:1.2rem; left:50%; transform:translateX(-50%); font:1rem var(--hand); color:var(--mut); animation:bob 1.8s ease-in-out infinite; }
+@keyframes bob { 50% { transform:translate(-50%,8px); } }
+
+/* layout */
+main { max-width:800px; margin:0 auto; padding:0 1.2rem 6rem; }
+.chapter { padding-top:4.5rem; }
+.chap-head { display:flex; gap:1.1rem; align-items:center; margin-bottom:1rem; }
+.chap-num { flex:none; width:4.2rem; height:4.2rem; border-radius:50%; background:var(--ink); color:var(--paper); display:grid; place-items:center; font:800 1.7rem var(--sans); transform:rotate(-6deg); box-shadow:4px 4px 0 var(--accent2); }
+.chap-head h2 { font-size:clamp(1.7rem,4vw,2.35rem); margin:0; }
+.chap-head .tag { font:1.02rem var(--hand); color:var(--pen); display:block; margin-top:.3rem; }
+
+/* reveal */
+.js .reveal { opacity:0; transform:translateY(26px); transition:opacity .7s ease, transform .7s ease; }
+.js .reveal.shown { opacity:1; transform:none; }
+
+/* head-first boxes */
+.box { position:relative; margin:2rem 0; padding:1.1rem 1.25rem 1rem; border:2px solid var(--ink); border-radius:6px; background:var(--paper2); box-shadow:5px 5px 0 var(--shadow); }
+.box > .lbl { position:absolute; top:-1rem; left:1rem; font:800 .82rem var(--sans); letter-spacing:.06em; text-transform:uppercase; background:var(--ink); color:var(--paper); padding:.25rem .65rem; border-radius:4px; transform:rotate(-2deg); }
+.box.brain { border-style:dashed; background:color-mix(in srgb, var(--accent) 8%, var(--paper2)); }
+.box.brain > .lbl { background:var(--accent); color:#fff; }
+.box.pencil { background:color-mix(in srgb, var(--accent2) 10%, var(--paper2)); }
+.box.pencil > .lbl { background:var(--accent2); color:#1c1c22; }
+.box.watch { border-color:var(--bad); box-shadow:5px 5px 0 var(--bad); }
+.box.watch > .lbl { background:var(--bad); color:#fff; }
+.box.geek { background:var(--card); font-size:.95em; }
+.box.geek > .lbl { background:var(--mut); }
+.box.relax { border-color:var(--ok); box-shadow:5px 5px 0 var(--ok); }
+.box.relax > .lbl { background:var(--ok); color:#fff; }
+.box.bullets { background:var(--note); transform:rotate(-.4deg); }
+.box.bullets ul { margin:.3rem 0 0; padding-left:1.2rem; }
+.box.bullets li { margin:.35rem 0; }
+.box.bullets li::marker { content:"▸ "; color:var(--pen); }
+.box p:first-of-type { margin-top:.4rem; }
+.box p:last-child { margin-bottom:0; }
+.qa { display:grid; grid-template-columns:auto 1fr; gap:.4rem .8rem; margin:.8rem 0 1rem; }
+.qa .q, .qa .a { font:800 1.15rem var(--sans); }
+.qa .q { color:var(--accent); } .qa .a { color:var(--pen); }
+.qa div { margin:0; }
+details { margin-top:.8rem; }
+summary { cursor:pointer; font:700 .95rem var(--sans); color:var(--pen); }
+.fire { display:grid; gap:.7rem; margin-top:.5rem; }
+.fire .who { font:800 .85rem var(--sans); text-transform:uppercase; letter-spacing:.05em; }
+.fire .line { display:grid; grid-template-columns:7.5rem 1fr; gap:.8rem; }
+.fire .line.l2 .who { color:var(--accent); } .fire .line.l1 .who { color:var(--pen); }
+@media (max-width:560px) { .fire .line { grid-template-columns:1fr; gap:.1rem; } }
+.anno { font:1.05rem/1.35 var(--hand); color:var(--pen); display:block; margin:.4rem 0 .4rem 1.2rem; transform:rotate(-1.2deg); }
+.anno::before { content:"↖ "; }
+.pull { font:italic 1.35rem/1.45 var(--serif); border-left:6px solid var(--accent2); padding:.2rem 0 .2rem 1rem; margin:1.6rem 0; }
+
+/* figures */
+.fig { margin:2.2rem -1rem; padding:1rem 1rem .9rem; background:var(--paper2); border:2px solid var(--ink); border-radius:8px; box-shadow:6px 6px 0 var(--shadow); position:relative; }
+@media (min-width:1000px) { .fig.wide { margin-left:-6rem; margin-right:-6rem; } }
+.fig .ftitle { font:800 .95rem var(--sans); margin:0 0 .6rem; display:flex; gap:.5rem; align-items:baseline; flex-wrap:wrap; }
+.fig .ftitle span { font:400 .85rem var(--sans); color:var(--mut); }
+.fig figcaption, .fig .cap { font:14px/1.45 var(--sans); color:var(--mut); margin-top:.6rem; }
+.fig svg { display:block; width:100%; height:auto; }
+.fig svg text { fill:var(--ink); font-family:var(--sans); }
+.ctrl { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin:.4rem 0 .6rem; font:14px var(--sans); }
+.btn { font:700 13.5px var(--sans); color:var(--ink); background:var(--paper2); border:2px solid var(--ink); border-radius:999px; padding:.33rem .85rem; box-shadow:2px 2px 0 var(--shadow); cursor:pointer; transition:transform .08s; }
+.btn:hover { background:var(--card); }
+.btn:active { transform:translate(2px,2px); box-shadow:none; }
+.btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn.on { background:var(--ink); color:var(--paper); }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
+.ctrl input[type=text], .ctrl select, .calc input { font:14px var(--mono); padding:.3rem .5rem; border:2px solid var(--ink); border-radius:6px; background:var(--paper); color:var(--ink); }
+.ctrl input[type=text] { width:9rem; }
+.ctrl label { display:inline-flex; gap:.35rem; align-items:center; }
+.scroll-x { overflow-x:auto; }
+.scroll-x > svg { min-width:620px; }
+.two { display:grid; grid-template-columns:1fr; gap:1rem; }
+@media (min-width:720px) { .two { grid-template-columns:1.2fr 1fr; align-items:start; } }
+table.mini { width:100%; border-collapse:collapse; font:13.5px var(--sans); }
+table.mini th, table.mini td { text-align:left; padding:.28rem .4rem; border-bottom:1px solid var(--line); }
+table.mini th { font-size:.75rem; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); }
+table.mini tr.flash td { animation:flashbg 1.2s ease; }
+@keyframes flashbg { 0%{ background:color-mix(in srgb, var(--accent2) 45%, transparent);} 100%{ background:transparent;} }
+.chip { display:inline-block; min-width:1.6em; text-align:center; font:800 12px var(--sans); color:#fff; padding:.1rem .4rem; border-radius:999px; }
+.status { font:14px/1.45 var(--sans); padding:.55rem .75rem; border-radius:6px; background:var(--card); margin-top:.5rem; min-height:2.2rem; }
+.status.ok { background:color-mix(in srgb, var(--ok) 16%, var(--paper2)); }
+.status.bad { background:color-mix(in srgb, var(--bad) 16%, var(--paper2)); }
+.status.warn { background:color-mix(in srgb, var(--warn) 20%, var(--paper2)); }
+
+/* svg bits */
+.ring-base { fill:none; stroke:var(--line); stroke-width:3; }
+.arc { fill:none; stroke-width:12; stroke-linecap:butt; opacity:.45; }
+.arc.draw { stroke-dasharray:1; stroke-dashoffset:1; animation:draw .9s ease forwards; }
+@keyframes draw { to { stroke-dashoffset:0; } }
+.edge { stroke:var(--line); stroke-width:2; }
+.nd circle { fill:var(--paper2); stroke:var(--ink); stroke-width:2.2; transition:fill .3s, opacity .3s; }
+.nd text { font-weight:800; font-size:13px; pointer-events:none; }
+.nd.dead circle { fill:var(--dim); stroke:var(--bad); stroke-dasharray:4 3; }
+.nd.dead text { fill:var(--bad) !important; }
+.nd.clickable { cursor:pointer; }
+.nd.pulse circle, .pop { animation:pulse .6s ease; transform-box:fill-box; transform-origin:center; }
+@keyframes pulse { 40% { transform:scale(1.35); } }
+text.light { fill:#fff !important; }
+.klbl { font-size:11px; font-family:var(--mono) !important; transition:opacity .4s; }
+.kdot { stroke:var(--paper2); stroke-width:1.5; transition:fill .4s, opacity .4s; }
+.fly { pointer-events:none; }
+.small { font-size:11px; }
+.tiny { font-size:9.5px; }
+
+/* write path */
+.wp-stage { position:relative; display:grid; gap:.8rem; grid-template-columns:1fr; font:14px var(--sans); }
+@media (min-width:700px) { .wp-stage { grid-template-columns:.7fr .8fr 2fr; align-items:center; } }
+.wbox { border:2px solid var(--ink); border-radius:8px; padding:.55rem .7rem; background:var(--paper); min-height:3rem; }
+.wbox .sub { color:var(--mut); font-size:12px; font-weight:400; }
+.zone { border:2px dashed var(--line); border-radius:10px; padding:.9rem .6rem .6rem; position:relative; margin-bottom:.6rem; display:grid; gap:.6rem; }
+.zone .zl { position:absolute; top:-.7rem; left:.7rem; background:var(--paper2); padding:0 .35rem; font:800 11px var(--sans); letter-spacing:.12em; color:var(--mut); }
+#wp-mem ul { list-style:none; margin:.3rem 0 0; padding:0; font:12.5px var(--mono); min-height:1.3rem; }
+#wp-mem li { padding:.1rem .3rem; border-radius:4px; }
+#wp-mem li.hl { background:color-mix(in srgb, var(--accent2) 40%, transparent); }
+#wp-mem.flushing { outline:3px solid var(--accent2); }
+.cl-list { display:flex; flex-wrap:wrap; gap:3px; margin-top:.35rem; min-height:1.4rem; }
+.cl-e { font:11px var(--mono); background:var(--accent); color:#fff; padding:.05rem .35rem; border-radius:3px; animation:pulse .4s; transition:opacity .5s; }
+.cl-e.tomb { background:var(--mut); }
+.cl-e.gone { opacity:.15; }
+.sst-list { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.35rem; min-height:1.4rem; }
+.sst-card { border:2px solid var(--ink); background:var(--card); border-radius:5px; padding:.2rem .45rem; font:12px var(--sans); }
+.sst-card .rows { font:11px var(--mono); display:flex; gap:3px; flex-wrap:wrap; }
+.sst-card .rows span { background:var(--paper2); border:1px solid var(--line); padding:0 .25rem; border-radius:3px; }
+.chip-fly { position:absolute; z-index:5; font:700 12px var(--sans); background:var(--accent2); color:#1c1c22; padding:.2rem .5rem; border-radius:999px; white-space:nowrap; box-shadow:2px 2px 0 var(--shadow); pointer-events:none; transform:translate(-50%,-50%); }
+.chip-fly.ok { background:var(--ok); color:#fff; }
+.wp-log { font:13.5px/1.45 var(--sans); background:var(--card); border-radius:6px; padding:.5rem .7rem; margin-top:.7rem; min-height:3.2rem; }
+
+/* gossip */
+.gossip-wrap { display:grid; grid-template-columns:1fr; gap:.8rem; }
+@media (min-width:720px) { .gossip-wrap { grid-template-columns:1fr 210px; } }
+#g-canvas { width:100%; height:340px; display:block; background:var(--paper); border-radius:6px; border:1px solid var(--line); }
+.g-side { font:13.5px/1.4 var(--sans); }
+.g-chart { display:flex; align-items:flex-end; gap:3px; height:110px; border-bottom:2px solid var(--ink); border-left:2px solid var(--ink); padding:0 4px; margin:.4rem 0 .2rem; }
+.g-chart div { flex:1; max-width:18px; background:var(--accent2); border-radius:2px 2px 0 0; transition:height .3s; }
+.meter { position:relative; height:14px; background:var(--card); border:2px solid var(--ink); border-radius:999px; overflow:hidden; margin:.3rem 0; }
+.meter .fill { position:absolute; inset:0 auto 0 0; width:0; background:var(--ok); transition:width .4s, background .3s; }
+.meter .thr { position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--bad); }
+
+/* consistency */
+.cons-grid { display:grid; grid-template-columns:1fr; gap:.8rem; }
+@media (min-width:760px) { .cons-grid { grid-template-columns:1.25fr 1fr; } }
+.facts { font:13.5px/1.5 var(--sans); }
+.facts .row { display:flex; justify-content:space-between; gap:1rem; padding:.2rem 0; border-bottom:1px dotted var(--line); }
+.facts .big { font:800 1.05rem var(--sans); padding:.5rem .6rem; border-radius:6px; margin:.5rem 0; }
+
+/* bloom */
+.bits { display:grid; grid-template-columns:repeat(16, 1fr); gap:3px; margin:.6rem 0; }
+.bit { aspect-ratio:1; border:1.5px solid var(--ink); border-radius:3px; display:grid; place-items:center; font:10px var(--mono); color:var(--mut); background:var(--paper); transition:background .3s; position:relative; }
+.bit.on { background:var(--accent); color:#fff; }
+.bit.hit { box-shadow:0 0 0 3px var(--accent2); }
+.bit.miss { box-shadow:0 0 0 3px var(--bad); }
+.rp-table td { vertical-align:top; }
+.rp-table tr.cur td { background:color-mix(in srgb, var(--accent2) 20%, transparent); }
+.rp-table td.skip { color:var(--mut); }
+.merge { display:grid; gap:.3rem; font:13.5px var(--mono); margin-top:.6rem; }
+.merge div { padding:.3rem .5rem; border-radius:4px; background:var(--card); }
+.merge .win { background:color-mix(in srgb, var(--ok) 20%, var(--paper2)); }
+.merge s { color:var(--mut); }
+
+/* compaction */
+.cmp-area { min-height:150px; font:12px var(--sans); }
+.blk-row { display:flex; flex-wrap:wrap; gap:5px; align-items:flex-end; min-height:40px; }
+.blk { height:34px; border:2px solid var(--ink); border-radius:4px; background:var(--accent); color:#fff; font:700 11px var(--sans); display:grid; place-items:center; transition:all .45s ease; }
+.blk.new { animation:pop .45s ease; }
+@keyframes pop { from { transform:scale(.3); opacity:0; } }
+.blk.merging { background:var(--accent2); color:#1c1c22; transform:translateY(-6px); }
+.blk.expired { background:var(--bad); opacity:.3; transform:scale(.7) rotate(-8deg); }
+.lvl { display:grid; grid-template-columns:3rem 1fr; gap:.6rem; align-items:center; margin:.35rem 0; }
+.lvl b { font:800 13px var(--sans); }
+.sq { display:inline-block; width:15px; height:15px; margin:1px; border:1.5px solid var(--ink); border-radius:2px; background:var(--paper); vertical-align:middle; transition:background .3s; }
+.sq.f { background:var(--accent); }
+.sq.m { background:var(--accent2); }
+.sq.s { width:9px; height:9px; border-width:1px; }
+.win-col { border:2px solid var(--line); border-radius:6px; padding:.35rem; min-width:84px; }
+.win-col.cur { border-color:var(--accent2); }
+.win-col.expired { opacity:.25; transform:scale(.9); transition:all .6s; }
+.win-col h5 { margin:0 0 .3rem; font:700 11px var(--sans); color:var(--mut); }
+.metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:.5rem; margin-top:.7rem; }
+.metric { background:var(--card); border-radius:6px; padding:.4rem .6rem; font:12px var(--sans); color:var(--mut); }
+.metric b { display:block; font:800 1.3rem var(--sans); color:var(--ink); }
+
+/* tombstones */
+.tl { position:relative; height:44px; margin:.6rem .6rem 1rem; font:11px var(--sans); }
+.tl .bar { position:absolute; left:0; right:0; top:18px; height:6px; background:var(--card); border:1.5px solid var(--ink); border-radius:999px; }
+.tl .gc { position:absolute; top:10px; bottom:6px; width:0; border-left:3px dashed var(--bad); }
+.tl .gc span { position:absolute; top:-12px; right:6px; white-space:nowrap; color:var(--bad); font-weight:700; }
+.tl .mk { position:absolute; top:12px; width:18px; height:18px; margin-left:-9px; border-radius:50%; background:var(--accent2); border:2px solid var(--ink); transition:left .6s ease; }
+.tl .d { position:absolute; top:30px; transform:translateX(-50%); color:var(--mut); }
+.reps { display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem; }
+.rep { border:2px solid var(--ink); border-radius:8px; padding:.5rem; min-height:110px; font:12.5px var(--sans); background:var(--paper); transition:opacity .3s; }
+.rep.down { opacity:.45; border-style:dashed; }
+.rep h5 { margin:0 0 .35rem; font:800 13px var(--sans); }
+.cell { padding:.2rem .35rem; border-radius:4px; margin:.2rem 0; animation:pop .4s; font-family:var(--mono); font-size:11.5px; }
+.cell.data { background:color-mix(in srgb, var(--accent) 16%, var(--paper2)); }
+.cell.data.shadow { text-decoration:line-through; opacity:.55; }
+.cell.tomb { background:var(--dim); color:#fff; }
+.cell.zombie { background:color-mix(in srgb, var(--bad) 30%, var(--paper2)); font-weight:700; }
+
+/* modeling */
+.prow { display:grid; grid-template-columns:11rem 1fr auto; gap:.5rem; align-items:center; padding:.35rem 0; border-bottom:1px solid var(--line); font:12.5px var(--sans); }
+.prow .pk { font:700 12px var(--mono); }
+.prow .pk small { display:block; font:11px var(--sans); color:var(--mut); font-weight:400; }
+.prow .cells { display:flex; gap:3px; flex-wrap:nowrap; overflow:hidden; }
+.prow .c { flex:none; width:22px; height:22px; border-radius:3px; background:var(--accent); border:1.5px solid var(--ink); animation:pop .35s; }
+.prow .more { font:11px var(--sans); color:var(--mut); align-self:center; margin-left:.3rem; white-space:nowrap; }
+.prow.hot .pk { color:var(--bad); }
+.prow.hot .c { background:var(--bad); }
+.loadbars { display:grid; grid-template-columns:repeat(6,1fr); gap:.4rem; align-items:end; height:90px; margin-top:.6rem; }
+.loadbars div { background:var(--accent2); border:1.5px solid var(--ink); border-radius:3px 3px 0 0; position:relative; transition:height .35s; min-height:2px; }
+.loadbars div span { position:absolute; bottom:-1.3rem; left:50%; transform:translateX(-50%); font:700 11px var(--sans); }
+.qf { display:grid; grid-template-columns:1fr; gap:.6rem; font:13.5px var(--sans); }
+@media (min-width:640px) { .qf { grid-template-columns:1fr auto 1fr; align-items:center; } }
+.qf .q { background:var(--note); border:2px solid var(--ink); border-radius:6px; padding:.4rem .6rem; }
+.qf .t { background:var(--card); border:2px solid var(--ink); border-radius:6px; padding:.4rem .6rem; font:12px var(--mono); }
+.qf .arrow { font:1.4rem var(--hand); color:var(--pen); text-align:center; }
+.calc { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.6rem; font:13px var(--sans); }
+.calc label { display:grid; gap:.2rem; }
+.calc input { width:100%; }
+
+/* quiz */
+.quiz-q { margin:1.2rem 0; padding:.9rem 1rem; border:2px solid var(--ink); border-radius:8px; background:var(--paper2); }
+.quiz-q h4 { margin:0 0 .6rem; font-size:1rem; }
+.quiz-q .opts { display:grid; gap:.4rem; }
+.quiz-q button { text-align:left; font:14px/1.4 var(--sans); color:var(--ink); background:var(--paper); border:2px solid var(--line); border-radius:6px; padding:.45rem .7rem; cursor:pointer; }
+.quiz-q button:hover:not(:disabled) { border-color:var(--ink); }
+.quiz-q button.right { border-color:var(--ok); background:color-mix(in srgb, var(--ok) 18%, var(--paper2)); }
+.quiz-q button.wrong { border-color:var(--bad); background:color-mix(in srgb, var(--bad) 15%, var(--paper2)); }
+.quiz-q .why { font:14px/1.45 var(--sans); color:var(--mut); margin-top:.5rem; display:none; }
+.quiz-q.done .why { display:block; }
+.score { position:sticky; bottom:1rem; margin-left:auto; width:max-content; font:800 1rem var(--sans); background:var(--ink); color:var(--paper); padding:.45rem .9rem; border-radius:999px; box-shadow:3px 3px 0 var(--accent2); }
+.cheat td:first-child { font-family:var(--mono); font-size:12.5px; white-space:nowrap; }
+footer { max-width:800px; margin:0 auto; padding:2rem 1.2rem 4rem; font:14px var(--sans); color:var(--mut); border-top:2px solid var(--line); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration:.001s !important; animation-iteration-count:1 !important; transition-duration:.001s !important; }
+  html { scroll-behavior:auto; }
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<nav id="toc" aria-label="Spis rozdziałów">
+  <b>Spis treści</b>
+  <a href="#intro">0 · Jak czytać</a>
+  <a href="#why">1 · Bez mastera</a>
+  <a href="#ring">2 · Pierścień tokenów</a>
+  <a href="#vnodes">3 · Vnodes</a>
+  <a href="#replication">4 · Replikacja</a>
+  <a href="#gossip">5 · Gossip</a>
+  <a href="#write">6 · Ścieżka zapisu</a>
+  <a href="#consistency">7 · Tunable consistency</a>
+  <a href="#read">8 · Ścieżka odczytu</a>
+  <a href="#compaction">9 · LSM i kompakcja</a>
+  <a href="#tombstones">10 · Tombstones</a>
+  <a href="#repair">11 · Drzewa Merkle</a>
+  <a href="#cap">12 · CAP i LWT</a>
+  <a href="#modeling">13 · Modelowanie</a>
+  <a href="#final">14 · Egzamin + ściąga</a>
+</nav>
+
+<header class="cover">
+  <div class="cover-inner">
+    <div>
+      <div class="kicker">Animowany kurs · architektura i design</div>
+      <h1>Cassandra <span>od środka</span></h1>
+      <p class="sub">Jak baza danych bez szefa przyjmuje miliony zapisów na sekundę, przeżywa awarie całych serwerowni
+        i&nbsp;nigdy nie robi&nbsp;<code>JOIN</code>-ów. Pierścienie, plotki, nagrobki i&nbsp;drzewa — przewijaj, a&nbsp;wszystko zacznie się ruszać.</p>
+      <div class="stamp">Twój mózg na Cassandrze 🧠</div>
+    </div>
+    <svg viewBox="0 0 400 400" aria-hidden="true">
+      <g class="spin">
+        <circle cx="200" cy="200" r="150" fill="none" stroke="var(--line)" stroke-width="4"/>
+        <g id="cover-nodes"></g>
+      </g>
+      <g class="spin-rev">
+        <circle cx="200" cy="200" r="95" fill="none" stroke="var(--accent2)" stroke-width="2" stroke-dasharray="4 10"/>
+      </g>
+      <!-- the eye (Cassandra's logo is an eye; she was the prophetess nobody believed) -->
+      <ellipse cx="200" cy="200" rx="62" ry="36" fill="var(--paper2)" stroke="var(--ink)" stroke-width="4"/>
+      <circle cx="200" cy="200" r="24" fill="var(--accent)"/>
+      <circle cx="200" cy="200" r="10" fill="var(--ink)"/>
+      <circle cx="207" cy="193" r="4" fill="#fff"/>
+    </svg>
+  </div>
+  <div class="scroll-hint">przewijaj ↓</div>
+</header>
+
+<main>
+
+<!-- ============================ 0 ============================ -->
+<section class="chapter" id="intro">
+  <div class="chap-head reveal"><div class="chap-num">0</div><div><h2>Jak czytać ten kurs</h2><span class="tag">…czyli dlaczego tu są obrazki, żarty i pytania</span></div></div>
+
+  <p class="reveal">Twój mózg jest leniwy w bardzo sprytny sposób: zapamiętuje to, co <em>dziwne, wizualne i emocjonalne</em>,
+  a wyrzuca nudne listy parametrów konfiguracyjnych. Dlatego zamiast suchej dokumentacji dostajesz tu diagramy,
+  które same się animują, pogawędki komponentów bazy danych i pytania, które zmuszą Cię do myślenia.
+  Merytorycznie nie odpuszczamy jednak niczego: po lekturze powinieneś umieć wyjaśnić, <em>dlaczego</em>
+  Cassandra zachowuje się tak, jak się zachowuje, a nie tylko <em>że</em> tak robi.</p>
+
+  <div class="box brain reveal"><span class="lbl">🧠 Mózg na wysokich obrotach</span>
+    <p>Zanim zaczniesz: jak zaprojektowałbyś bazę, która ma przyjmować zapisy <b>zawsze</b> — nawet gdy połowa serwerów
+    w jednej serwerowni właśnie zniknęła z sieci? Kto decyduje, gdzie leżą dane? Kto pilnuje porządku? Zapisz swoją odpowiedź
+    (serio, choćby w głowie) i porównaj ją z Cassandrą za 13 rozdziałów.</p>
+  </div>
+
+  <p class="reveal">Każdy diagram ze znaczkiem <b>▶</b> startuje sam, gdy wjedzie na ekran, ale możesz go też klikać, psuć i resetować.
+  Najwięcej nauczysz się, <em>psując</em>: wyłączaj węzły, zmieniaj poziomy spójności, zapominaj o naprawach i patrz, co się stanie.</p>
+
+  <div class="box geek reveal"><span class="lbl">🤓 Rodowód</span>
+    <p>Cassandra powstała w Facebooku (2008, Avinash Lakshman i Prashant Malik) do wyszukiwania w skrzynce odbiorczej.
+    To skrzyżowanie dwóch słynnych publikacji: <b>Amazon Dynamo</b> (2007) dał jej model dystrybucji — pierścień,
+    consistent hashing, gossip, hinted handoff, tunable consistency, drzewa Merkle — a <b>Google Bigtable</b> (2006)
+    model przechowywania: memtable, SSTable, commit log, kompakcja i model „szerokich wierszy”.
+    Zapamiętaj ten podział: <em>Dynamo = jak dane się rozchodzą po klastrze, Bigtable = jak leżą na jednym dysku.</em></p>
+  </div>
+</section>
+
+<!-- ============================ 1 ============================ -->
+<section class="chapter" id="why">
+  <div class="chap-head reveal"><div class="chap-num">1</div><div><h2>Dlaczego bez mastera?</h2><span class="tag">demokracja węzłów: każdy równy, nikt niezastąpiony</span></div></div>
+
+  <p class="reveal">Klasyczna replikacja <b>master–slave</b> jest prosta: wszystkie zapisy idą do jednego serwera, który rozsyła je do kopii.
+  Prosta aż do chwili, gdy master padnie. Wtedy zapisy stoją, dopóki ktoś (człowiek albo automat typu failover) nie wybierze nowego
+  szefa — a jeśli wybierze dwóch naraz, masz <em>split brain</em>. Do tego master jest wąskim gardłem: wszystkie zapisy przechodzą przez jeden
+  serwer, więc dokładanie maszyn nie zwiększa przepustowości zapisu.</p>
+
+  <p class="reveal">Cassandra jest <b>masterless / peer-to-peer</b>: każdy węzeł może przyjąć dowolne zapytanie (staje się wtedy jego
+  <b>koordynatorem</b>), każdy zna topologię klastra, każdy przechowuje fragment danych. Nie ma pojedynczego punktu awarii
+  i nie ma specjalnych ról — nawet „seed nodes”, o których jeszcze usłyszysz, to tylko adresy kontaktowe, a nie szefowie.</p>
+
+  <figure class="fig" id="fig-why">
+    <div class="ftitle">▶ Awaria w dwóch światach <span>kropki to zapisy klientów; po kilku sekundach coś pada</span></div>
+    <div class="ctrl"><button class="btn primary" data-act="crash">💥 Wyłącz węzeł</button></div>
+    <div class="scroll-x"><svg viewBox="0 0 760 335"></svg></div>
+    <div class="two" style="grid-template-columns:1fr 1fr">
+      <div class="status st-left">Master–slave: wszystkie zapisy przez M.</div>
+      <div class="status st-right">Cassandra: każdy węzeł może koordynować zapis.</div>
+    </div>
+  </figure>
+
+  <div class="box nodumb reveal"><span class="lbl">❓ Nie istnieją głupie pytania</span>
+    <div class="qa">
+      <div class="q">P:</div><div>Skoro nie ma mastera, kto decyduje, na którym serwerze leży mój wiersz?</div>
+      <div class="a">O:</div><div><b>Matematyka.</b> Każdy węzeł liczy to samo: hash klucza partycji → pozycja na pierścieniu → właściciel.
+      Nie trzeba nikogo pytać, bo wszyscy mają tę samą mapę (dzięki gossipowi) i tę samą funkcję haszującą. Rozdział 2.</div>
+      <div class="q">P:</div><div>A kto pilnuje, żeby kopie danych były zgodne?</div>
+      <div class="a">O:</div><div>Nikt centralnie — i to jest świadoma decyzja. Zgodność jest „dociągana” przez trzy mechanizmy:
+      <b>hinted handoff</b> (przy zapisie), <b>read repair</b> (przy odczycie) i <b>anti-entropy repair</b> (w tle, drzewa Merkle).
+      Zobaczysz wszystkie trzy.</div>
+    </div>
+  </div>
+
+  <div class="box bullets reveal"><span class="lbl">📌 Celne spostrzeżenia</span>
+    <ul>
+      <li>Każdy węzeł jest równy: przyjmuje zapisy i odczyty, zna topologię, przechowuje część danych.</li>
+      <li>Węzeł, który dostał zapytanie od klienta, jest dla tego zapytania <b>koordynatorem</b>.</li>
+      <li>Przepustowość rośnie liniowo z liczbą węzłów, bo nie ma wąskiego gardła.</li>
+      <li>Cena: brak globalnej kolejności zapisów i spójność, którą <em>ty</em> konfigurujesz (rozdział 7).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ 2 ============================ -->
+<section class="chapter" id="ring">
+  <div class="chap-head reveal"><div class="chap-num">2</div><div><h2>Pierścień i consistent hashing</h2><span class="tag">gdzie leży mój wiersz? zapytaj funkcję haszującą</span></div></div>
+
+  <p class="reveal">Każdy wiersz w Cassandrze ma <b>klucz partycji</b> (partition key). Domyślny <b>partitioner</b>,
+  <code>Murmur3Partitioner</code>, zamienia go na 64-bitową liczbę — <b>token</b> — z zakresu od −2<sup>63</sup> do 2<sup>63</sup>−1.
+  Wyobraź sobie ten zakres zwinięty w okrąg: to jest <b>pierścień</b> (ring). Każdy węzeł ma na nim swój token i jest właścicielem
+  zakresu od tokena poprzednika (wyłącznie) do własnego (włącznie). Żeby znaleźć właściciela klucza, idziesz od jego tokena
+  <b>zgodnie z ruchem wskazówek zegara</b> do pierwszego napotkanego węzła.</p>
+
+  <figure class="fig wide" id="fig-ring">
+    <div class="ftitle">▶ Pierścień tokenów <span>wpisz dowolny klucz, np. swoje imię</span></div>
+    <div class="ctrl">
+      <input type="text" placeholder="klucz partycji" aria-label="klucz partycji">
+      <button class="btn primary" data-act="add">Wstaw klucz</button>
+      <button class="btn" data-act="node">➕ Dodaj węzeł G</button>
+    </div>
+    <div class="two">
+      <svg viewBox="0 0 420 420"></svg>
+      <div>
+        <table class="mini"><thead><tr><th>klucz</th><th>token</th><th>węzeł</th></tr></thead><tbody></tbody></table>
+        <div class="status stats">Dodaj węzeł G i zobacz, ile kluczy musi się przeprowadzić.</div>
+      </div>
+    </div>
+    <figcaption>Hash w tej animacji to uproszczony 32-bitowy mieszacz (Cassandra używa Murmur3 x64_128 i bierze pierwsze 64 bity),
+      ale geometria jest identyczna.</figcaption>
+  </figure>
+
+  <p class="reveal">Dlaczego nie zwykłe <code>hash(klucz) mod N</code>? Bo zmiana <code>N</code> przetasowuje prawie wszystko:
+  przy przejściu z 6 na 7 serwerów ~86% kluczy zmienia właściciela, a każdy przeprowadzany klucz to dane przesyłane przez sieć.
+  W consistent hashingu nowy węzeł <em>rozcina jeden zakres</em> — przeprowadzają się tylko klucze z kawałka między nim a jego poprzednikiem.
+  Kliknij „Dodaj węzeł G” i porównaj liczby.</p>
+
+  <div class="box pencil reveal"><span class="lbl">✏️ Zaostrz ołówek</span>
+    <p>Klaster ma 4 węzły z tokenami (w uproszczeniu na skali 0–100): <b>A=10, B=40, C=70, D=90</b>. Który węzeł jest właścicielem kluczy
+    o tokenach <b>5</b>, <b>40</b>, <b>41</b> i <b>95</b>?</p>
+    <details><summary>Odpowiedź</summary>
+      <p>5 → <b>A</b> (pierwszy token ≥ 5 to 10). 40 → <b>B</b> (zakres jest domknięty z prawej, więc token równy tokenowi węzła należy do niego).
+      41 → <b>C</b>. 95 → <b>A</b> — nie ma tokena ≥ 95, więc „zawijamy” przez koniec pierścienia do najmniejszego tokena.</p>
+    </details>
+  </div>
+
+  <div class="box geek reveal"><span class="lbl">🤓 Dla dociekliwych: partitioner</span>
+    <p>Partitioner ustawia się raz, dla całego klastra, i nie da się go zmienić bez przeładowania wszystkich danych.
+    Historyczny <code>RandomPartitioner</code> używał MD5 (tokeny 0…2<sup>127</sup>), a <code>ByteOrderedPartitioner</code>
+    układał klucze leksykograficznie — co pozwalało na zapytania zakresowe po kluczu partycji, ale tworzyło gorące punkty
+    (wszystkie klucze „2026-09-…” lądowały na jednym węźle). Dlatego Cassandra celowo <em>niszczy</em> kolejność kluczy partycji:
+    równomierny rozkład jest ważniejszy niż skanowanie zakresu. Kolejność zachowuje się dopiero <em>wewnątrz</em> partycji
+    (kolumny klastrujące — rozdział 13).</p>
+  </div>
+</section>
+
+<!-- ============================ 3 ============================ -->
+<section class="chapter" id="vnodes">
+  <div class="chap-head reveal"><div class="chap-num">3</div><div><h2>Vnodes — wirtualne węzły</h2><span class="tag">jeden serwer, wiele kawałków tortu</span></div></div>
+
+  <p class="reveal">Jeden token na serwer ma dwie wady. Po pierwsze, zakresy wychodzą nierówne, więc jeden węzeł dźwiga dwa razy więcej danych niż sąsiad.
+  Po drugie, gdy węzeł padnie, <b>cały</b> jego zakres przejmuje jeden sąsiad (i tylko on streamuje dane do zastępcy). Rozwiązanie z Cassandry 1.2:
+  każdy fizyczny węzeł dostaje wiele tokenów — <b>vnodes</b>. Liczbę ustawia <code>num_tokens</code> (kiedyś domyślnie 256, od Cassandry 4.0
+  domyślnie <b>16</b> w połączeniu z inteligentnym algorytmem przydziału tokenów <code>allocate_tokens_for_local_replication_factor</code>).</p>
+
+  <figure class="fig" id="fig-vnodes">
+    <div class="ftitle">▶ Jeden token kontra vnodes <span>kolor łuku = fizyczny węzeł, który jest właścicielem zakresu</span></div>
+    <div class="ctrl">
+      <button class="btn on" data-mode="single">1 token / węzeł</button>
+      <button class="btn" data-mode="vnodes">8 vnodes / węzeł</button>
+      <button class="btn" data-act="kill">💥 Usuń węzeł D</button>
+    </div>
+    <div class="two">
+      <svg viewBox="0 0 400 400"></svg>
+      <div>
+        <div class="vbars facts"></div>
+        <div class="status vtext"></div>
+      </div>
+    </div>
+  </figure>
+
+  <div class="box nodumb reveal"><span class="lbl">❓ Nie istnieją głupie pytania</span>
+    <div class="qa">
+      <div class="q">P:</div><div>To czemu nie 1000 vnodes na węzeł? Im więcej, tym równiej.</div>
+      <div class="a">O:</div><div>Bo każdy zakres kosztuje: więcej metadanych w gossipie, wolniejsze repair (naprawia się zakres po zakresie)
+      i — co ważniejsze — przy dużej liczbie tokenów <em>każdy</em> węzeł współdzieli jakiś zakres z prawie każdym innym. Wtedy utrata dowolnych
+      dwóch węzłów przy RF=3 i QUORUM prawie na pewno uniemożliwia dostęp do jakiegoś fragmentu danych. Stąd zejście z 256 na 16 w wersji 4.0.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 4 ============================ -->
+<section class="chapter" id="replication">
+  <div class="chap-head reveal"><div class="chap-num">4</div><div><h2>Replikacja, snitch i centra danych</h2><span class="tag">nie wkładaj wszystkich jajek do jednej szafy serwerowej</span></div></div>
+
+  <p class="reveal"><b>Replication factor</b> (RF) mówi, ile kopii każdego wiersza trzyma klaster. RF ustawia się na poziomie <b>keyspace’u</b>
+  razem ze <b>strategią replikacji</b>. Pierwsza replika trafia do właściciela tokena, a kolejne — do następnych węzłów idąc zgodnie z zegarem.
+  Tu zaczyna się różnica między strategiami:</p>
+  <ul class="reveal">
+    <li><code>SimpleStrategy</code> — bierze po prostu kolejne RF węzłów. Dobre tylko na laptopa, bo nie wie nic o szafach i serwerowniach.</li>
+    <li><code>NetworkTopologyStrategy</code> — RF osobno dla każdego centrum danych (np. <code>{'dc1': 3, 'dc2': 2}</code>); idąc po pierścieniu,
+    <em>pomija</em> węzły z DC, które ma już komplet, i stara się rozkładać repliki po różnych <b>rackach</b> (szafach). To jest wybór produkcyjny.</li>
+  </ul>
+
+  <pre class="reveal"><code>CREATE KEYSPACE sklep WITH replication = {
+  'class': 'NetworkTopologyStrategy', 'dc1': 3, 'dc2': 2
+};</code></pre>
+
+  <figure class="fig" id="fig-repl">
+    <div class="ftitle">▶ Gdzie trafiają repliki? <span>zmień strategię i RF, potem kliknij „Umieść”</span></div>
+    <div class="ctrl">
+      <button class="btn on" data-strat="simple">SimpleStrategy</button>
+      <button class="btn" data-strat="nts">NetworkTopologyStrategy</button>
+      <label class="rf-simple">RF <select data-k="rf"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></label>
+      <label class="rf-nts" hidden>dc1 <select data-k="rf1"><option>1</option><option selected>2</option><option>3</option></select></label>
+      <label class="rf-nts" hidden>dc2 <select data-k="rf2"><option>1</option><option selected>2</option><option>3</option></select></label>
+      <input type="text" value="user:42" aria-label="klucz">
+      <button class="btn primary" data-act="place">Umieść</button>
+    </div>
+    <div class="two">
+      <svg viewBox="0 0 400 400"></svg>
+      <ul class="facts rlog" style="list-style:none;padding-left:0;margin:0"></ul>
+    </div>
+  </figure>
+
+  <p class="reveal">Skąd Cassandra wie, który węzeł jest w którym DC i racku? Od <b>snitcha</b>. W produkcji używa się
+  <code>GossipingPropertyFileSnitch</code>: każdy węzeł czyta swoje DC i rack z pliku <code>cassandra-rackdc.properties</code>
+  i ogłasza je reszcie przez gossip. Nad nim zawsze działa <b>dynamic snitch</b>, który mierzy opóźnienia replik i przy odczytach
+  omija wolniejsze („ten węzeł ma właśnie GC pause — zapytajmy inną replikę”).</p>
+
+  <div class="box watch reveal"><span class="lbl">⚠️ Uwaga, pułapka</span>
+    <p>RF nie może być większe niż liczba węzłów w danym DC, a <b>zmiana RF nie przenosi danych sama</b>: po <code>ALTER KEYSPACE</code>
+    nowe repliki są puste, dopóki nie uruchomisz <code>nodetool repair</code> (albo <code>rebuild</code> dla nowego DC). Do tego czasu odczyty
+    z niskim CL mogą trafiać w pustą replikę i „nie widzieć” danych.</p>
+  </div>
+</section>
+
+<!-- ============================ 5 ============================ -->
+<section class="chapter" id="gossip">
+  <div class="chap-head reveal"><div class="chap-num">5</div><div><h2>Gossip i wykrywanie awarii</h2><span class="tag">plotka obiega klaster szybciej niż myślisz</span></div></div>
+
+  <p class="reveal">Skoro nie ma centralnego rejestru, skąd węzły wiedzą, kto żyje, jakie ma tokeny, w którym jest DC i jaką wersję schematu?
+  <b>Z plotek.</b> Co sekundę każdy węzeł wybiera losowo jednego żywego rozmówcę (czasem dodatkowo węzeł uznany za martwy
+  i seed) i wymienia się z nim stanem w trzech wiadomościach: <code>GossipDigestSyn</code> → <code>GossipDigestAck</code> →
+  <code>GossipDigestAck2</code>. Każda informacja ma wersję (para <em>generation</em> — czas startu węzła — i rosnący <em>version</em>),
+  więc zawsze wiadomo, która jest świeższa.</p>
+
+  <p class="reveal">Magia epidemii: w każdej rundzie liczba „wtajemniczonych” mniej więcej się podwaja, więc informacja dociera do
+  <b>N</b> węzłów po około <b>log₂N</b> rundach. 1000 węzłów? Kilkanaście sekund. Patrz sam:</p>
+
+  <figure class="fig wide" id="fig-gossip">
+    <div class="ftitle">▶ Epidemia plotki w 32-węzłowym klastrze <span>żółty = zna nową wersję stanu; linie = rozmowy w tej rundzie</span></div>
+    <div class="ctrl">
+      <button class="btn primary" data-act="rumor">📣 Nowa plotka</button>
+      <button class="btn" data-act="kill">💀 Zabij węzeł</button>
+    </div>
+    <div class="gossip-wrap">
+      <canvas id="g-canvas"></canvas>
+      <div class="g-side">
+        <b>Wtajemniczeni / runda</b>
+        <div class="g-chart"></div>
+        <div class="g-info status">…</div>
+        <div style="margin-top:.7rem"><b>Detektor awarii φ</b></div>
+        <div class="meter"><div class="fill"></div><div class="thr" style="left:66.6%"></div></div>
+        <div class="phi-txt mut">Zabij węzeł, żeby zobaczyć, jak rośnie podejrzenie.</div>
+      </div>
+    </div>
+  </figure>
+
+  <p class="reveal">Wykrywanie awarii to nie „nie odpowiedział 3 razy = martwy”. Cassandra używa <b>Phi Accrual Failure Detector</b>:
+  zamiast binarnej decyzji liczy poziom podejrzenia <b>φ</b> na podstawie historii odstępów między heartbeatami danego węzła.
+  φ rośnie z czasem ciszy (przy odstępach ~1 s: φ ≈ cisza / ln 10); gdy przekroczy <code>phi_convict_threshold</code> (domyślnie <b>8</b>),
+  węzeł zostaje uznany za DOWN — lokalnie, przez każdego obserwatora osobno. W chmurach z niestabilną siecią podnosi się to do 10–12.</p>
+
+  <div class="box fireside reveal"><span class="lbl">🔥 Pogawędka przy kominku</span>
+    <p class="mut" style="margin-top:.4rem">Dzisiejsi goście: <b>Seed Node</b> i <b>Zwykły Węzeł</b>.</p>
+    <div class="fire">
+      <div class="line l1"><div class="who">Zwykły Węzeł</div><div>Słyszałem, że jesteś kimś ważnym. „Seed”. Brzmi jak szef.</div></div>
+      <div class="line l2"><div class="who">Seed</div><div>Nie, nie. Jestem po prostu adresem, który nowi znają na pamięć. Gdy startujesz i nikogo nie znasz, pukasz do mnie, a ja opowiadam ci o reszcie klastra.</div></div>
+      <div class="line l1"><div class="who">Zwykły Węzeł</div><div>I tyle? Nie zatwierdzasz zapisów, nie trzymasz mapy klastra?</div></div>
+      <div class="line l2"><div class="who">Seed</div><div>Mapę ma każdy z nas. Jedyna różnica: węzły trochę częściej plotkują ze mną, co pomaga szybko zszyć klaster po podziale sieci. Jak padnę, nic się nie zawali — nowe węzły po prostu zapukają do innego seeda z listy. Dlatego w każdym DC jest 2–3 seedy, a nie wszystkie węzły.</div></div>
+      <div class="line l1"><div class="who">Zwykły Węzeł</div><div>Czyli jesteś… recepcją.</div></div>
+      <div class="line l2"><div class="who">Seed</div><div>Recepcją z dobrą pamięcią. Tylko nie próbuj bootstrapować mnie jako nowego węzła — seed nie bootstrapuje się sam z siebie i nie pobierze danych.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 6 ============================ -->
+<section class="chapter" id="write">
+  <div class="chap-head reveal"><div class="chap-num">6</div><div><h2>Ścieżka zapisu</h2><span class="tag">dlaczego zapisy w Cassandrze są tak absurdalnie szybkie</span></div></div>
+
+  <p class="reveal">Tajemnica szybkich zapisów: <b>Cassandra nigdy nie nadpisuje danych na dysku w miejscu i nie czyta przed zapisem.</b>
+  Każdy zapis na replice to dwa tanie kroki: dopisanie na koniec <b>commit logu</b> (sekwencyjny zapis — trwałość na wypadek awarii)
+  i wstawienie do <b>memtable</b> (posortowana struktura w pamięci). Potwierdzenie leci do koordynatora. Koniec.
+  Kiedy memtable urośnie, zostaje w całości zrzucona (<b>flush</b>) do nowego, <b>niezmiennego</b> pliku <b>SSTable</b>
+  (Sorted String Table). To właśnie struktura <b>LSM-tree</b> (Log-Structured Merge tree) odziedziczona po Bigtable.</p>
+
+  <figure class="fig wide" id="fig-write">
+    <div class="ftitle">▶ Zapis krok po kroku <span>INSERT i DELETE to w Cassandrze ten sam rodzaj operacji: dopisanie</span></div>
+    <div class="ctrl">
+      <button class="btn primary" data-act="insert">✍️ INSERT</button>
+      <button class="btn" data-act="delete">🪦 DELETE</button>
+      <button class="btn" data-act="flush">💾 Flush teraz</button>
+      <button class="btn" data-act="reset">↺ Reset</button>
+    </div>
+    <div class="wp-stage">
+      <div class="wbox" id="wp-client"><b>👩‍💻 Klient</b><div class="sub">sterownik (driver)</div></div>
+      <div class="wbox" id="wp-coord"><b>🧭 Koordynator</b><div class="sub">węzeł, który dostał zapytanie</div></div>
+      <div>
+        <div class="zone"><span class="zl">PAMIĘĆ (RAM)</span>
+          <div class="wbox" id="wp-mem"><b>Memtable</b> <span class="sub">posortowana po kluczu · flush przy 5 kluczach</span><ul></ul></div>
+        </div>
+        <div class="zone"><span class="zl">DYSK</span>
+          <div class="wbox" id="wp-cl"><b>Commit log</b> <span class="sub">append-only, tylko do odtwarzania po awarii</span><div class="cl-list"></div></div>
+          <div class="wbox" id="wp-sst"><b>SSTables</b> <span class="sub">niezmienne pliki, nigdy nie edytowane</span><div class="sst-list"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="wp-log">Kliknij INSERT (albo po prostu poczekaj).</div>
+  </figure>
+
+  <div class="box fireside reveal"><span class="lbl">🔥 Pogawędka przy kominku</span>
+    <p class="mut" style="margin-top:.4rem">Dzisiejsi goście: <b>Commit Log</b> i <b>Memtable</b>.</p>
+    <div class="fire">
+      <div class="line l1"><div class="who">Memtable</div><div>Nie rozumiem, po co ty w ogóle jesteś. Wszystkie dane mam ja, ładnie posortowane, do odczytu gotowe.</div></div>
+      <div class="line l2"><div class="who">Commit Log</div><div>Masz je w RAM-ie. Zabierz prąd i co ci zostanie?</div></div>
+      <div class="line l1"><div class="who">Memtable</div><div>…nic. Ale ty jesteś nieczytelny! Pomieszane klucze, jeden za drugim, bez ładu.</div></div>
+      <div class="line l2"><div class="who">Commit Log</div><div>I dlatego jestem szybki: tylko dopisuję na koniec, zero szukania po dysku. Nikt mnie nigdy nie czyta — poza restartem po awarii, kiedy odtwarzam ciebie.</div></div>
+      <div class="line l1"><div class="who">Memtable</div><div>A kiedy mnie zrzucą do SSTable?</div></div>
+      <div class="line l2"><div class="who">Commit Log</div><div>Wtedy moje segmenty z twoimi danymi idą do recyklingu. Jesteśmy zespołem: ja daję trwałość, ty szybkie sortowanie. Aha, i fsync robię domyślnie co 10 sekund (<code>commitlog_sync: periodic</code>) — replikacja na inne węzły chroni przed tym, że akurat te 10 sekund zginie z jednego serwera.</div></div>
+    </div>
+  </div>
+
+  <h3 class="reveal">Kiedy replika leży: hinted handoff</h3>
+  <p class="reveal">Koordynator wysyła zapis do <b>wszystkich</b> replik danego klucza. Jeśli któraś jest DOWN (wie to z gossipu),
+  zapisuje dla niej <b>hint</b> — „przypominajkę” z mutacją — na swoim dysku. Gdy gossip ogłosi, że replika wróciła, koordynator
+  odtwarza jej hinty. Hinty zbiera się tylko przez <code>max_hint_window</code> (domyślnie <b>3 godziny</b>); węzeł leżący dłużej
+  trzeba naprawić przez <code>nodetool repair</code>. Hint to optymalizacja, nie gwarancja — i (poza CL=ANY) nie liczy się do potwierdzeń zapisu.</p>
+
+  <div class="box bullets reveal"><span class="lbl">📌 Celne spostrzeżenia</span>
+    <ul>
+      <li>Zapis = commit log (sekwencyjnie) + memtable (RAM). Żadnego odczytu przed zapisem, żadnych blokad wierszy.</li>
+      <li>INSERT i UPDATE to to samo: <b>upsert</b>. Wygrywa wartość z nowszym <b>timestampem</b> (per komórka, nie per wiersz).</li>
+      <li>SSTable są niezmienne. „Zmiana” i „usunięcie” to nowe wpisy, które przesłaniają stare — sprzątanie robi kompakcja.</li>
+      <li>Hinted handoff łata krótkie awarie (≤ 3 h); dłuższe łata repair.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ 7 ============================ -->
+<section class="chapter" id="consistency">
+  <div class="chap-head reveal"><div class="chap-num">7</div><div><h2>Tunable consistency</h2><span class="tag">spójność to suwak, nie przełącznik</span></div></div>
+
+  <p class="reveal">Każde zapytanie niesie <b>consistency level</b> (CL): ile replik musi odpowiedzieć, zanim koordynator uzna operację za udaną.
+  Najważniejsze poziomy: <code>ONE</code>, <code>TWO</code>, <code>THREE</code>, <code>QUORUM</code> (⌊RF/2⌋+1 replik),
+  <code>ALL</code>, a dla wielu DC: <code>LOCAL_ONE</code>, <code>LOCAL_QUORUM</code> (kworum tylko w lokalnym DC — najpopularniejszy wybór produkcyjny)
+  i <code>EACH_QUORUM</code>. Dla zapisów jest jeszcze <code>ANY</code> — wystarczy, że <em>ktokolwiek</em>, choćby koordynator jako hint, przyjął zapis.</p>
+
+  <p class="pull reveal">Magiczna nierówność: jeśli <b>R + W &gt; RF</b>, zbiór replik, które potwierdziły zapis, i zbiór replik czytanych muszą się przeciąć —
+  więc odczyt zobaczy najnowszą potwierdzoną wartość.</p>
+
+  <figure class="fig wide" id="fig-cons">
+    <div class="ftitle">▶ Laboratorium spójności <span>kliknij replikę, żeby ją wyłączyć / włączyć</span></div>
+    <div class="ctrl">
+      <label>RF <select data-k="rf"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></label>
+      <label>zapis CL <select data-k="w"><option>ANY</option><option selected>ONE</option><option>TWO</option><option>THREE</option><option>QUORUM</option><option>ALL</option></select></label>
+      <label>odczyt CL <select data-k="r"><option selected>ONE</option><option>TWO</option><option>THREE</option><option>QUORUM</option><option>ALL</option></select></label>
+      <label><input type="checkbox" data-k="hh" checked> hinted handoff</label>
+    </div>
+    <div class="ctrl">
+      <button class="btn primary" data-act="write">✍️ Zapisz</button>
+      <button class="btn primary" data-act="read">📖 Czytaj</button>
+      <button class="btn" data-act="repair">🔧 nodetool repair</button>
+    </div>
+    <div class="cons-grid">
+      <svg viewBox="0 0 560 330"></svg>
+      <div class="facts"></div>
+    </div>
+    <div class="status cstatus">Spróbuj: RF=3, zapis ONE, odczyt ONE, wyłącz hinted handoff, wyłącz R1, zapisz, włącz R1 i czytaj kilka razy.</div>
+    <figcaption>Repliki do odczytu wybierane są tu losowo — w prawdziwym klastrze wybiera je dynamic snitch (najszybsze).
+      Pierwsza dostaje żądanie pełnych danych, pozostałe tylko o <em>digest</em> (hash odpowiedzi).</figcaption>
+  </figure>
+
+  <div class="box nodumb reveal"><span class="lbl">❓ Nie istnieją głupie pytania</span>
+    <div class="qa">
+      <div class="q">P:</div><div>Przy zapisie z CL=ONE dane trafiają tylko do jednej repliki?</div>
+      <div class="a">O:</div><div><b>Nie!</b> To najczęstszy mit. Koordynator zawsze wysyła zapis do <em>wszystkich</em> replik (RF).
+      CL mówi tylko, na ile potwierdzeń czeka, zanim odpowie klientowi. Pozostałe repliki dostaną dane chwilę później.</div>
+      <div class="q">P:</div><div>A jeśli zapis z QUORUM się nie uda (timeout), to dane zostały zapisane czy nie?</div>
+      <div class="a">O:</div><div>Może tak, może nie, może częściowo. <code>WriteTimeoutException</code> znaczy „nie dostałem dość potwierdzeń na czas” — nie ma rollbacku.
+      Dlatego zapisy w Cassandrze projektuje się jako <b>idempotentne</b>, żeby można je było bezpiecznie ponowić.
+      Za to <code>UnavailableException</code> znaczy „z góry wiedziałem, że za mało replik żyje, nic nie wysłałem”.</div>
+    </div>
+  </div>
+
+  <div class="box pencil reveal"><span class="lbl">✏️ Zaostrz ołówek</span>
+    <p>RF=3 w każdym z dwóch DC. Aplikacja w dc1 pisze i czyta z <code>LOCAL_QUORUM</code>. (1) Czy odczyt w dc1 zawsze widzi zapis z dc1?
+    (2) Czy aplikacja w dc2 czytająca <code>LOCAL_QUORUM</code> zawsze widzi zapis z dc1? (3) Ile węzłów w dc1 może leżeć?</p>
+    <details><summary>Odpowiedź</summary>
+      <p>(1) Tak: 2 + 2 &gt; 3 w obrębie dc1. (2) Nie — replikacja do dc2 jest asynchroniczna względem klienta; spójność między DC jest ewentualna
+      (chyba że zapis idzie z <code>EACH_QUORUM</code> albo <code>QUORUM</code> liczonym po wszystkich 6 replikach). (3) Jedna replika danego zakresu;
+      przy vnodes w praktyce „jeden węzeł w DC”, bo dwa leżące węzły prawie na pewno dzielą jakiś zakres.</p>
+    </details>
+  </div>
+</section>
+
+<!-- ============================ 8 ============================ -->
+<section class="chapter" id="read">
+  <div class="chap-head reveal"><div class="chap-num">8</div><div><h2>Ścieżka odczytu</h2><span class="tag">poszukiwanie wiersza rozrzuconego po wielu plikach</span></div></div>
+
+  <p class="reveal">Zapisy były tanie, bo niczego nie porządkowaliśmy. Rachunek przychodzi przy odczycie: kawałki jednego wiersza mogą leżeć
+  w memtable i w kilku SSTables (każdy UPDATE innej kolumny to osobny fragment). Replika musi je <b>wszystkie</b> znaleźć i scalić,
+  wybierając dla każdej komórki wartość z <b>najnowszym timestampem</b>. Żeby nie czytać każdego pliku z dysku, każda SSTable ma zestaw pomocników:</p>
+  <ol class="reveal">
+    <li><b>Filtr Blooma</b> (<code>Filter.db</code>, w RAM) — probabilistyczne „na pewno nie ma” albo „może jest”.</li>
+    <li><b>Key cache</b> — pamięta pozycje ostatnio czytanych partycji w pliku.</li>
+    <li><b>Partition summary</b> (próbka indeksu w RAM) → <b>partition index</b> (<code>Index.db</code>) — gdzie w pliku zaczyna się partycja.
+      <span class="mut">(Cassandra 5.0 ma też nowy format BTI oparty na drzewach trie: <code>Partitions.db</code>/<code>Rows.db</code>.)</span></li>
+    <li><b>Compression offsets</b> (<code>CompressionInfo.db</code>) — który skompresowany blok (domyślnie 16 KiB) trzeba rozpakować.</li>
+    <li>Wreszcie <b>dane</b> (<code>Data.db</code>).</li>
+  </ol>
+
+  <figure class="fig" id="fig-bloom">
+    <div class="ftitle">▶ Filtr Blooma na żywo <span>32 bity, 3 funkcje haszujące</span></div>
+    <div class="ctrl">
+      <input type="text" value="ala" aria-label="klucz">
+      <button class="btn primary" data-act="add">Dodaj do SSTable</button>
+      <button class="btn" data-act="test">Sprawdź klucz</button>
+      <button class="btn" data-act="fp">🎯 Znajdź fałszywe trafienie</button>
+    </div>
+    <div class="bits"></div>
+    <div class="status bstatus">Dodaj klucze, potem sprawdzaj inne.</div>
+    <figcaption class="bfp"></figcaption>
+  </figure>
+
+  <p class="reveal">Filtr Blooma nigdy nie kłamie w stronę „nie ma” — jeśli choć jeden z bitów klucza jest zerem, klucza na pewno nie dodano.
+  Może natomiast fałszywie powiedzieć „może jest”. Prawdopodobieństwo ustawia <code>bloom_filter_fp_chance</code> (typowo 0.01; im mniej,
+  tym więcej RAM-u). Tu kompletny odczyt klucza <code>id=42</code> na jednej replice:</p>
+
+  <figure class="fig wide" id="fig-readpath">
+    <div class="ftitle">▶ Odczyt <code>SELECT * FROM users WHERE id = 42</code> na replice</div>
+    <div class="ctrl"><button class="btn primary" data-act="play">▶ Odtwórz</button></div>
+    <div class="scroll-x">
+      <table class="mini rp-table" style="min-width:560px">
+        <thead><tr><th>źródło</th><th>filtr Blooma</th><th>indeks / pozycja</th><th>znalezione komórki</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="merge"></div>
+  </figure>
+
+  <h3 class="reveal">Poziom wyżej: koordynator i read repair</h3>
+  <p class="reveal">Przy CL wyższym niż ONE koordynator prosi <b>jedną</b> (najszybszą według dynamic snitcha) replikę o pełne dane, a pozostałe tylko o
+  <b>digest</b> — hash wyniku. Jeśli hashe się zgadzają, odsyła wynik. Jeśli nie — pobiera pełne dane od wszystkich pytanych, scala je
+  (najnowszy timestamp wygrywa) i przed odpowiedzią <b>dopisuje brakujące wersje do przestarzałych replik</b>. To jest <b>blocking read repair</b>
+  (w Cassandrze 4.0 usunięto dawne losowe „read_repair_chance”; zostało naprawianie tego, co wyszło przy okazji odczytu).
+  Dodatkowo <b>speculative retry</b> (domyślnie <code>99p</code>) wysyła zapytanie do kolejnej repliki, jeśli pierwsza odpowiada wolniej niż 99. percentyl.
+  Możesz to zobaczyć w laboratorium spójności z rozdziału 7.</p>
+
+  <div class="box relax reveal"><span class="lbl">😌 Rozluźnij się</span>
+    <p>Nie musisz pamiętać nazw wszystkich plików SSTable. Zapamiętaj zasadę: <b>każda SSTable więcej to potencjalnie jeden odczyt dysku więcej</b>.
+    Stąd cała reszta — filtry Blooma, cache i przede wszystkim kompakcja, która trzyma liczbę SSTables w ryzach.</p>
+  </div>
+</section>
+
+<!-- ============================ 9 ============================ -->
+<section class="chapter" id="compaction">
+  <div class="chap-head reveal"><div class="chap-num">9</div><div><h2>LSM-tree i kompakcja</h2><span class="tag">sprzątanie po imprezie niezmiennych plików</span></div></div>
+
+  <p class="reveal">Każdy flush dokłada nową SSTable. Bez sprzątania po tygodniu miałbyś ich tysiące, a każdy odczyt dotykałby dziesiątek plików.
+  <b>Kompakcja</b> bierze kilka SSTables, scala je sortowaniem przez scalanie (merge sort — tanie, bo pliki już są posortowane),
+  wybiera najnowsze wersje komórek, wyrzuca nadpisane dane i przedawnione tombstony, i zapisuje <em>nowy</em> plik. Stare są usuwane.
+  Każda strategia to kompromis między trzema „wzmocnieniami”:</p>
+  <ul class="reveal">
+    <li><b>read amplification</b> — ile SSTables trzeba przejrzeć przy odczycie,</li>
+    <li><b>write amplification</b> — ile razy te same bajty są przepisywane na dysk,</li>
+    <li><b>space amplification</b> — ile dodatkowego miejsca zajmują duplikaty i sama kompakcja (STCS potrafi potrzebować chwilowo 2× miejsca!).</li>
+  </ul>
+
+  <figure class="fig wide" id="fig-compaction">
+    <div class="ftitle">▶ Symulator kompakcji <span>co takt memtable robi flush nowej SSTable (~10 MB)</span></div>
+    <div class="ctrl">
+      <button class="btn on" data-mode="stcs">STCS</button>
+      <button class="btn" data-mode="lcs">LCS</button>
+      <button class="btn" data-mode="twcs">TWCS</button>
+      <button class="btn" data-act="pause">⏸ Pauza</button>
+      <button class="btn" data-act="reset">↺ Reset</button>
+    </div>
+    <div class="cmp-area"></div>
+    <div class="metrics"></div>
+    <div class="status cmp-desc"></div>
+  </figure>
+
+  <div class="box geek reveal"><span class="lbl">🤓 Która strategia kiedy?</span>
+    <p><b>SizeTieredCompactionStrategy (STCS)</b> — domyślna przez lata. Scala ≥ <code>min_threshold</code> (4) plików o podobnym rozmiarze.
+    Świetna dla obciążeń z przewagą zapisów; słabsza dla odczytów aktualizowanych wierszy i wymaga dużo wolnego miejsca.</p>
+    <p><b>LeveledCompactionStrategy (LCS)</b> — pliki po ~160 MB w poziomach L1, L2… każdy 10× większy od poprzedniego, w obrębie poziomu
+    zakresy tokenów się nie nakładają. ~90% odczytów obsługuje jedna SSTable. Płacisz dużo większym write amplification — dobra do
+    obciążeń z przewagą odczytów i częstymi aktualizacjami.</p>
+    <p><b>TimeWindowCompactionStrategy (TWCS)</b> — dla szeregów czasowych z TTL. Dane grupowane w okna czasowe; po zamknięciu okna
+    jego SSTables scalają się w jedną i już nigdy nie są dotykane. Gdy wszystko w pliku wygaśnie, <b>cały plik jest po prostu usuwany</b> —
+    zero kompakcji tombstonów. Warunek: nie aktualizuj starych danych i nie mieszaj TTL-i.</p>
+    <p><b>UnifiedCompactionStrategy (UCS)</b> — nowość z Cassandry 5.0: jedna strategia sparametryzowana tak, by płynnie przechodzić między zachowaniem
+    „tiered” a „leveled”, z równoległą kompakcją shardów.</p>
+  </div>
+</section>
+
+<!-- ============================ 10 ============================ -->
+<section class="chapter" id="tombstones">
+  <div class="chap-head reveal"><div class="chap-num">10</div><div><h2>Tombstones — nagrobki</h2><span class="tag">jak usunąć coś z niezmiennych plików? postawić nagrobek</span></div></div>
+
+  <p class="reveal">Skoro SSTables są niezmienne, <code>DELETE</code> nie może niczego wymazać. Zamiast tego zapisuje <b>tombstone</b> —
+  znacznik „ta komórka / wiersz / zakres / partycja jest usunięta od timestampu T”. Przy odczycie tombstone przesłania starsze dane,
+  a przy kompakcji dane i nagrobek w końcu znikają. Tombstony powstają też, gdy:</p>
+  <ul class="reveal">
+    <li>wygasa <b>TTL</b> (komórka zamienia się w tombstone),</li>
+    <li>wstawiasz <code>null</code> do kolumny (tak, <code>INSERT … VALUES (…, null)</code> tworzy tombstone!),</li>
+    <li>nadpisujesz całą kolekcję (<code>SET tags = {…}</code> najpierw zapisuje range tombstone).</li>
+  </ul>
+
+  <p class="reveal">Ale uwaga: kompakcja może wyrzucić tombstone dopiero po <b><code>gc_grace_seconds</code></b> (domyślnie <b>864000 s = 10 dni</b>).
+  Dlaczego tak długo? Bo nagrobek musi zdążyć dotrzeć do <em>wszystkich</em> replik. Jeśli któraś go nie dostała, a pozostałe już go usunęły…
+  zobacz sam, co się dzieje:</p>
+
+  <figure class="fig wide" id="fig-tomb">
+    <div class="ftitle">▶ Atak zombie <span>RF=3, usuwamy email użytkownika</span></div>
+    <div class="ctrl">
+      <label><input type="radio" name="tomb-repair" value="yes"> repair przed upływem gc_grace</label>
+      <label><input type="radio" name="tomb-repair" value="no" checked> bez repair</label>
+    </div>
+    <div class="ctrl">
+      <button class="btn" data-act="prev">◀</button>
+      <button class="btn primary" data-act="next">Dalej ▶</button>
+      <button class="btn" data-act="auto">⏯ Auto</button>
+      <button class="btn" data-act="restart">↺ Od początku</button>
+    </div>
+    <div class="tl"><div class="bar"></div><div class="gc"><span>gc_grace_seconds</span></div><div class="mk"></div></div>
+    <div class="reps"></div>
+    <div class="status tstatus"></div>
+  </figure>
+
+  <div class="box watch reveal"><span class="lbl">⚠️ Uwaga: anty-wzorzec kolejki</span>
+    <p>Tabela używana jak kolejka (wstaw zadanie → przeczytaj najstarsze → usuń) to klasyczna katastrofa. Każde „pobranie z kolejki”
+    musi przeskoczyć tysiące tombstonów poprzednich zadań, bo leżą w tej samej partycji przez 10 dni. Po przekroczeniu
+    <code>tombstone_warn_threshold</code> (1000 tombstonów w jednym zapytaniu) dostajesz ostrzeżenie w logach, a po
+    <code>tombstone_failure_threshold</code> (100 000) zapytanie jest przerywane (<code>TombstoneOverwhelmingException</code>).</p>
+  </div>
+
+  <div class="box bullets reveal"><span class="lbl">📌 Celne spostrzeżenia</span>
+    <ul>
+      <li>Delete to zapis. Tombstone przesłania dane z mniejszym timestampem (przy remisie timestampów tombstone wygrywa).</li>
+      <li>Tombstone żyje co najmniej <code>gc_grace_seconds</code>; wyrzuca go dopiero kompakcja, która widzi też przesłonięte dane.</li>
+      <li><b>Pełny repair każdej tabeli musi przejść częściej niż raz na gc_grace_seconds</b> — inaczej grożą zombie.</li>
+      <li>Nie wstawiaj nulli, nie używaj tabel jako kolejek, preferuj TTL + TWCS dla danych z datą ważności.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ 11 ============================ -->
+<section class="chapter" id="repair">
+  <div class="chap-head reveal"><div class="chap-num">11</div><div><h2>Anti-entropy repair i drzewa Merkle</h2><span class="tag">jak porównać terabajty, przesyłając kilobajty</span></div></div>
+
+  <p class="reveal">Hinted handoff i read repair naprawiają tylko to, co „przy okazji” zauważą. Dane, których nikt nie czyta, mogą się rozjeżdżać latami.
+  Dlatego jest <b><code>nodetool repair</code></b>: każda replika buduje dla swojego zakresu tokenów <b>drzewo Merkle</b>
+  (tzw. validation compaction — czyta dane i je haszuje). Liście to hashe małych podzakresów tokenów, a każdy węzeł wewnętrzny to hash
+  dzieci. Repliki wymieniają się drzewami, porównują je od korzenia w dół i <b>streamują tylko te podzakresy, których liście się różnią</b>.</p>
+
+  <figure class="fig wide" id="fig-merkle">
+    <div class="ftitle">▶ Porównanie drzew Merkle dwóch replik <span>8 liści = 8 podzakresów tokenów</span></div>
+    <div class="ctrl">
+      <button class="btn primary" data-act="compare">🔍 Porównaj</button>
+      <button class="btn" data-act="fix">🔧 Streamuj różnice</button>
+      <button class="btn" data-act="new">🎲 Nowa rozbieżność</button>
+    </div>
+    <div class="scroll-x"><svg viewBox="0 0 780 290"></svg></div>
+    <div class="status mstatus">Identyczne hashe korzeni = identyczne dane w całym zakresie. Różne = schodzimy niżej.</div>
+  </figure>
+
+  <div class="box geek reveal"><span class="lbl">🤓 Repair w praktyce</span>
+    <p>Prawdziwe drzewa są głębokie (do 2<sup>20</sup> liści na sesję), ale i tak każdy liść obejmuje sporo partycji — jedna różna komórka
+    powoduje przesłanie całego podzakresu („overstreaming”). Rodzaje: <b>full repair</b> (wszystko), <b>incremental repair</b> (domyślny w
+    <code>nodetool repair</code> od lat; naprawia tylko SSTables jeszcze nienaprawione i oznacza je jako „repaired”), <code>-pr</code>
+    (tylko zakres główny danego węzła — uruchamiasz na każdym węźle po kolei). W praktyce repair orkiestruje się narzędziem
+    (Cassandra Reaper lub wbudowany w nowsze wersje harmonogram), bo ręczne pilnowanie „raz na gc_grace” to proszenie się o zombie.</p>
+  </div>
+</section>
+
+<!-- ============================ 12 ============================ -->
+<section class="chapter" id="cap">
+  <div class="chap-head reveal"><div class="chap-num">12</div><div><h2>CAP, AP i lightweight transactions</h2><span class="tag">gdy sieć się rozpada, wybierz: odpowiadać czy mieć rację</span></div></div>
+
+  <p class="reveal">Twierdzenie CAP mówi, że gdy nastąpi <b>podział sieci (P)</b>, system musi wybrać między <b>spójnością (C)</b>
+  a <b>dostępnością (A)</b>. Cassandra jest projektowana jako <b>AP</b>: domyślnie woli przyjąć zapis i pogodzić wersje później
+  (last-write-wins po timestampie). Ale dzięki tunable consistency <em>pojedyncze zapytanie</em> może zażądać zachowania „CP-podobnego”
+  (np. QUORUM) — kosztem tego, że po mniejszościowej stronie podziału dostanie błąd.</p>
+
+  <figure class="fig" id="fig-cap">
+    <div class="ftitle">▶ Podział sieci <span>RF=3: repliki A i B po lewej, C po prawej</span></div>
+    <div class="ctrl">
+      <label>CL <select data-k="cl"><option>ONE</option><option>QUORUM</option><option>ALL</option></select></label>
+      <button class="btn primary" data-act="go">⚡ Przetnij sieć i zapisz z obu stron</button>
+    </div>
+    <svg viewBox="0 0 600 250"></svg>
+    <div class="status capstatus">Wybierz CL i przetnij sieć.</div>
+  </figure>
+
+  <div class="box geek reveal"><span class="lbl">🤓 PACELC — ważniejsze na co dzień</span>
+    <p>Podziały sieci są rzadkie; opóźnienia są zawsze. Rozszerzenie PACELC mówi: gdy <b>P</b> — wybierz A lub C; w przeciwnym razie (<b>E</b>lse) —
+    wybierz <b>L</b>atency lub <b>C</b>onsistency. Cassandra to PA/EL: nawet bez awarii domyślnie wybiera niskie opóźnienia (CL=ONE/LOCAL_ONE),
+    a ty podnosisz CL tam, gdzie spójność jest warta dodatkowych milisekund.</p>
+  </div>
+
+  <h3 class="reveal">Lightweight transactions (LWT)</h3>
+  <p class="reveal">Czasem naprawdę potrzebujesz „zapisz tylko, jeśli…”, np. unikalna nazwa użytkownika. Do tego służą LWT:
+  <code>INSERT … IF NOT EXISTS</code>, <code>UPDATE … IF balance = 100</code>. Pod spodem działa <b>Paxos</b> między replikami danej partycji
+  (CL <code>SERIAL</code> / <code>LOCAL_SERIAL</code>): prepare/promise, odczyt aktualnej wartości, propose/accept, commit — klasycznie
+  <b>4 rundy sieciowe</b> zamiast jednej (Paxos v2 z Cassandry 4.1 ścina to do ~2). To linearizowalność dla jednej partycji — nie ma transakcji
+  obejmujących wiele partycji (na to czeka projekt Accord z CEP-15). Używaj LWT oszczędnie i nie mieszaj ich ze zwykłymi zapisami tych samych danych.</p>
+
+  <pre class="reveal"><code>INSERT INTO users_by_login (login, user_id) VALUES ('ala', 42) IF NOT EXISTS;
+--  [applied] | login | user_id
+--  False     | ala   | 17        ← ktoś był szybszy</code></pre>
+</section>
+
+<!-- ============================ 13 ============================ -->
+<section class="chapter" id="modeling">
+  <div class="chap-head reveal"><div class="chap-num">13</div><div><h2>Modelowanie danych: najpierw zapytania</h2><span class="tag">zapomnij o 3NF — projektujesz pod odczyt</span></div></div>
+
+  <p class="reveal">W bazie relacyjnej modelujesz <em>byty</em> i relacje, a zapytania składasz JOIN-ami. W Cassandrze nie ma JOIN-ów,
+  a zapytanie powinno trafić w <b>jedną partycję</b> (jeden zestaw replik, kilka sekwencyjnych odczytów). Zatem odwracasz proces:
+  <b>zaczynasz od listy zapytań aplikacji, a dla każdego projektujesz tabelę</b> (query-first modeling). Te same dane lądują w kilku tabelach —
+  to <b>denormalizacja</b> i jest zamierzona: dysk jest tani, a zapisy szybkie. Płacisz tym, że aplikacja (lub batch <code>LOGGED</code>) musi pisać do kilku tabel.</p>
+
+  <div class="fig reveal" style="box-shadow:none">
+    <div class="ftitle">Od zapytań do tabel</div>
+    <div class="qf">
+      <div class="q">Q1: Pokaż ostatnie wiadomości na kanale</div><div class="arrow">→</div><div class="t">messages_by_channel<br>((channel_id, bucket), sent_at DESC)</div>
+      <div class="q">Q2: Pokaż kanały użytkownika</div><div class="arrow">→</div><div class="t">channels_by_user<br>((user_id), channel_name)</div>
+      <div class="q">Q3: Znajdź użytkownika po loginie</div><div class="arrow">→</div><div class="t">users_by_login<br>((login))</div>
+    </div>
+  </div>
+
+  <h3 class="reveal">Anatomia klucza głównego</h3>
+<pre class="reveal"><code>CREATE TABLE messages_by_channel (
+  channel_id  text,
+  bucket      text,        -- np. tydzień: '2026-W39'
+  sent_at     timeuuid,
+  author      text,
+  body        text,
+  PRIMARY KEY ((channel_id, bucket), sent_at)
+) WITH CLUSTERING ORDER BY (sent_at DESC);</code></pre>
+  <ul class="reveal">
+    <li><b>Klucz partycji</b> <code>(channel_id, bucket)</code> — to, co idzie do hasha i wybiera węzły. Zapytanie <em>musi</em> podać go w całości (równość).</li>
+    <li><b>Kolumny klastrujące</b> <code>sent_at</code> — sortują wiersze <em>wewnątrz</em> partycji na dysku. Pozwalają na zakresy (<code>sent_at &gt; …</code>) i <code>ORDER BY</code> — ale tylko w kolejności ich deklaracji.</li>
+    <li>Partycja z wieloma wierszami to <b>wide partition</b> („wide row” z czasów Thrift): jeden klucz, tysiące posortowanych wierszy, czytanych sekwencyjnie jednym „plasterkiem”.</li>
+  </ul>
+
+  <figure class="fig wide" id="fig-model">
+    <div class="ftitle">▶ Szerokie partycje i gorące punkty <span>każdy kwadracik to wiersz (wiadomość); najnowsze po lewej (DESC)</span></div>
+    <div class="ctrl">
+      <button class="btn primary" data-act="send">💬 Wyślij wiadomość</button>
+      <button class="btn" data-act="flood">🌊 Zalej #ogólny (60 wiadomości)</button>
+      <label><input type="checkbox" data-k="bucket"> bucketing: klucz = (kanał, tydzień)</label>
+      <button class="btn" data-act="reset">↺</button>
+    </div>
+    <div class="partitions"></div>
+    <div style="font:12px var(--sans);color:var(--mut);margin-top:.8rem">Wiersze na węzłach A–F (RF=1, żeby było widać nierówność):</div>
+    <div class="loadbars"></div>
+    <div class="status mdstatus" style="margin-top:1.8rem">Wyślij kilka wiadomości, a potem zalej jeden kanał.</div>
+  </figure>
+
+  <div class="box pencil reveal"><span class="lbl">✏️ Zaostrz ołówek: kalkulator partycji</span>
+    <p>Reguła kciuka: trzymaj partycję poniżej <b>~100 MB</b> i <b>~100 000 wierszy</b>. Liczba wartości (komórek) w partycji:
+    <b>N<sub>v</sub> = N<sub>r</sub> × (N<sub>c</sub> − N<sub>pk</sub> − N<sub>s</sub>) + N<sub>s</sub></b>
+    (wiersze × kolumny nie-kluczowe i nie-statyczne + kolumny statyczne).</p>
+    <div class="calc">
+      <label>wierszy na partycję (N<sub>r</sub>)<input type="number" data-k="nr" value="50000"></label>
+      <label>wszystkich kolumn (N<sub>c</sub>)<input type="number" data-k="nc" value="5"></label>
+      <label>kolumn klucza (N<sub>pk</sub>)<input type="number" data-k="npk" value="3"></label>
+      <label>kolumn statycznych (N<sub>s</sub>)<input type="number" data-k="ns" value="0"></label>
+      <label>średnio bajtów / wiersz<input type="number" data-k="bytes" value="400"></label>
+    </div>
+    <div class="status calc-out"></div>
+  </div>
+
+  <div class="box watch reveal"><span class="lbl">⚠️ Anty-wzorce modelowania</span>
+    <ul style="margin:.4rem 0 0;padding-left:1.2rem">
+      <li><code>ALLOW FILTERING</code> na dużej tabeli — skanuje cały klaster. Jeśli go potrzebujesz, brakuje ci tabeli.</li>
+      <li>Nieograniczone partycje (kanał/czujnik/użytkownik bez bucketu czasowego) — rosną w nieskończoność i robią gorące punkty.</li>
+      <li>Klucz partycji o niskiej kardynalności (<code>country</code>, <code>status</code>) — kilka gigantycznych partycji zamiast milionów małych.</li>
+      <li>Read-before-write („przeczytaj, zmień, zapisz”) — wyścigi; użyj upsertu, liczników albo LWT.</li>
+      <li>Klasyczne indeksy wtórne na kolumnach o wysokiej kardynalności — zapytanie pyta każdy węzeł. (Nowe <b>SAI</b> z Cassandry 5.0 radzą sobie znacznie lepiej, ale nadal nie zastąpią dobrze dobranego klucza partycji.)</li>
+      <li>Wielkie batche na wiele partycji „dla wydajności” — batch w Cassandrze służy atomowości, nie szybkości; obciąża koordynatora.</li>
+    </ul>
+  </div>
+
+  <div class="box bullets reveal"><span class="lbl">📌 Celne spostrzeżenia</span>
+    <ul>
+      <li>Jedno zapytanie → jedna tabela → (najlepiej) jedna partycja.</li>
+      <li>Klucz partycji = rozkład danych i równomierność obciążenia; kolumny klastrujące = kolejność i zakresy wewnątrz partycji.</li>
+      <li>Denormalizacja jest normalna; spójność między tabelami utrzymuje aplikacja (logged batch dla atomowości).</li>
+      <li>Ogranicz wzrost partycji bucketem (czas, hash) — patrz rozmiar i liczba wierszy.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ 14 ============================ -->
+<section class="chapter" id="final">
+  <div class="chap-head reveal"><div class="chap-num">14</div><div><h2>Egzamin końcowy i ściąga</h2><span class="tag">sprawdź, czy twój mózg wszystko zapamiętał</span></div></div>
+
+  <div id="quiz"></div>
+  <div class="score" id="score">Wynik: 0 / 0</div>
+
+  <h3 class="reveal">Ściąga: parametry, które warto znać</h3>
+  <div class="reveal scroll-x">
+  <table class="mini cheat">
+    <thead><tr><th>parametr</th><th>domyślnie</th><th>co robi</th></tr></thead>
+    <tbody>
+      <tr><td>partitioner</td><td>Murmur3Partitioner</td><td>klucz partycji → token (−2⁶³ … 2⁶³−1)</td></tr>
+      <tr><td>num_tokens</td><td>16 (4.0+), dawniej 256</td><td>liczba vnodes na węzeł</td></tr>
+      <tr><td>phi_convict_threshold</td><td>8</td><td>próg φ, po którym węzeł jest uznany za DOWN</td></tr>
+      <tr><td>max_hint_window</td><td>3 h</td><td>jak długo zbierać hinty dla leżącej repliki</td></tr>
+      <tr><td>commitlog_sync</td><td>periodic, 10 s</td><td>jak często fsync commit logu</td></tr>
+      <tr><td>gc_grace_seconds</td><td>864000 (10 dni)</td><td>minimalny czas życia tombstone; repair musi być częstszy</td></tr>
+      <tr><td>tombstone_warn / failure_threshold</td><td>1 000 / 100 000</td><td>ostrzeżenie / przerwanie zapytania skanującego tombstony</td></tr>
+      <tr><td>bloom_filter_fp_chance</td><td>0.01</td><td>odsetek fałszywych „może jest” w filtrze Blooma</td></tr>
+      <tr><td>speculative_retry</td><td>99p</td><td>kiedy zapytać dodatkową replikę przy odczycie</td></tr>
+      <tr><td>compaction</td><td>STCS (UCS w 5.0 jako alternatywa)</td><td>strategia scalania SSTables, per tabela</td></tr>
+      <tr><td>QUORUM</td><td>⌊RF/2⌋ + 1</td><td>R + W &gt; RF ⇒ odczyt widzi ostatni potwierdzony zapis</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="box relax reveal"><span class="lbl">🎓 Gratulacje</span>
+    <p>Przeszedłeś całą drogę: od hasha klucza, przez pierścień, plotki, commit log, memtable i SSTables, po drzewa Merkle i model zapytań.
+    Wróć do pytania z rozdziału 0 — twoja baza „zawsze przyjmująca zapisy” prawdopodobnie wygląda teraz podejrzanie podobnie do Cassandry.
+    Następny krok: postaw 3 węzły w Dockerze, włącz <code>nodetool status</code>, <code>nodetool tablestats</code> i <code>TRACING ON</code> w cqlsh —
+    i obejrzyj te same mechanizmy na prawdziwych danych.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  Kurs edukacyjny w jednym pliku HTML — bez frameworków, bez build-stepu, bez zależności sieciowych. Animacje: SVG, Canvas i IntersectionObserver.
+  Apache Cassandra jest znakiem towarowym Apache Software Foundation; ta strona nie jest z nią powiązana.
+  · <a href="https://github.com/gbryk1/html-tools-local-llm" target="_blank" rel="noopener">Źródło na GitHubie</a>
+  · <a href="index.html">Inne narzędzia</a>
+</footer>
+
+<script>
+'use strict';
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SVGNS = 'http://www.w3.org/2000/svg';
+const sleep = ms => new Promise(r => setTimeout(r, REDUCE ? 0 : ms));
+function S(tag, attrs = {}, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function T(parent, x, y, text, attrs = {}) {
+  const t = S('text', Object.assign({ x, y, 'text-anchor': 'middle' }, attrs), parent);
+  t.textContent = text;
+  return t;
+}
+function H(tag, cls, html, parent) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html != null) e.innerHTML = html;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const ease = k => (k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+function tween(ms, fn) {
+  return new Promise(res => {
+    if (REDUCE || ms <= 0) { fn(1); return res(); }
+    const t0 = performance.now();
+    const step = t => {
+      const k = Math.min(1, (t - t0) / ms);
+      fn(ease(k));
+      if (k < 1) requestAnimationFrame(step); else res();
+    };
+    requestAnimationFrame(step);
+  });
+}
+// FNV-1a + murmur finalizer: small, well-mixed 32-bit hash for the demos
+function h32(str, seed = 0) {
+  let h = (0x811c9dc5 ^ seed) >>> 0;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+  return h >>> 0;
+}
+const frac = s => h32(s) / 4294967296;
+const hex = (s, n = 6) => h32(s).toString(16).padStart(8, '0').slice(0, n);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const COLORS = ['#3b82c4', '#e39b2d', '#2f9e63', '#d64545', '#8e5cc9', '#15a0a0', '#c2528b', '#7a8b99'];
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C = {};
+function readColors() { for (const k of ['ink', 'paper', 'paper2', 'mut', 'line', 'accent', 'accent2', 'ok', 'bad', 'warn', 'dim', 'card']) C[k] = cssVar('--' + k); }
+readColors();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+function fmtToken(f) {
+  const v = (f * 2 - 1) * 9.223372036854776;
+  return `${v < 0 ? '−' : ''}${Math.abs(v).toFixed(2)}·10¹⁸`;
+}
+function ringXY(cx, cy, r, f) { const a = f * 2 * Math.PI - Math.PI / 2; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+function arcD(cx, cy, r, f0, f1) {
+  let d = f1 - f0; if (d <= 0) d += 1; if (d >= 0.9999) d = 0.9999;
+  const [x0, y0] = ringXY(cx, cy, r, f0), [x1, y1] = ringXY(cx, cy, r, f0 + d);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${d > .5 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+function flyDot(parent, x0, y0, x1, y1, { ms = 600, color = C.accent, r = 5 } = {}) {
+  const c = S('circle', { cx: x0, cy: y0, r, class: 'fly' }, parent);
+  c.style.fill = color;
+  return tween(ms, k => { c.setAttribute('cx', x0 + (x1 - x0) * k); c.setAttribute('cy', y0 + (y1 - y0) * k); }).then(() => c.remove());
+}
+function runAlong(parent, cx, cy, r, f0, f1, { color = C.accent2, ms } = {}) {
+  let d = f1 - f0; if (d < 0) d += 1;
+  const c = S('circle', { r: 6, class: 'fly' }, parent);
+  c.style.fill = color; c.style.stroke = C.ink; c.style.strokeWidth = 1.5;
+  return tween(ms || 250 + d * 1500, k => {
+    const [x, y] = ringXY(cx, cy, r, f0 + d * k);
+    c.setAttribute('cx', x); c.setAttribute('cy', y);
+  }).then(() => c.remove());
+}
+function floatText(parent, x, y, text, color) {
+  const t = T(parent, x, y, text, { class: 'fly', 'font-size': 16, 'font-weight': 800 });
+  if (color) t.style.fill = color;
+  return tween(1100, k => { t.setAttribute('y', y - 18 * k); t.style.opacity = 1 - k * k; }).then(() => t.remove());
+}
+function pulseG(g) { if (!g) return; g.classList.remove('pulse'); void g.getBoundingClientRect(); g.classList.add('pulse'); setTimeout(() => g.classList.remove('pulse'), 650); }
+
+/* ---------- scroll machinery ---------- */
+const bar = $('#progress');
+let ticking = false;
+addEventListener('scroll', () => {
+  if (ticking) return; ticking = true;
+  requestAnimationFrame(() => {
+    const h = document.documentElement.scrollHeight - innerHeight;
+    bar.style.transform = `scaleX(${h > 0 ? scrollY / h : 0})`;
+    document.body.classList.toggle('past-cover', scrollY > innerHeight * .8);
+    ticking = false;
+  });
+}, { passive: true });
+
+const revealIO = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting) { e.target.classList.add('shown'); revealIO.unobserve(e.target); }
+}), { threshold: 0.12 });
+$$('.reveal').forEach(el => revealIO.observe(el));
+
+const tocLinks = new Map($$('#toc a').map(a => [a.getAttribute('href').slice(1), a]));
+const tocIO = new IntersectionObserver(es => es.forEach(e => {
+  if (!e.isIntersecting) return;
+  tocLinks.forEach(a => a.classList.remove('active'));
+  const a = tocLinks.get(e.target.id); if (a) a.classList.add('active');
+}), { rootMargin: '-35% 0px -60% 0px' });
+$$('section.chapter').forEach(s => tocIO.observe(s));
+
+// Figures: first() runs once when first seen, enter()/leave() start/stop loops.
+const figIO = new IntersectionObserver(es => es.forEach(e => {
+  const f = e.target._fig; if (!f) return;
+  if (e.isIntersecting) {
+    if (f.visible) return;
+    f.visible = true;
+    if (!f.seen) { f.seen = true; f.first && f.first(); }
+    f.enter && f.enter();
+  } else if (f.visible) {
+    f.visible = false; f.leave && f.leave();
+  }
+}), { threshold: 0.25 });
+function registerFig(el, api) { el._fig = api; figIO.observe(el); return api; }
+
+/* ---------- cover ---------- */
+(() => {
+  const g = $('#cover-nodes');
+  for (let i = 0; i < 8; i++) {
+    const [x, y] = ringXY(200, 200, 150, i / 8);
+    const c = S('circle', { cx: x, cy: y, r: 16 }, g);
+    c.style.fill = COLORS[i]; c.style.stroke = 'var(--ink)'; c.style.strokeWidth = 3;
+  }
+})();
+
+/* ---------- 1. master-slave vs masterless ---------- */
+(() => {
+  const root = $('#fig-why'), s = $('svg', root);
+  const stL = $('.st-left', root), stR = $('.st-right', root), btn = $('[data-act=crash]', root);
+  const cL = { x: 190, y: 36 }, cR = { x: 570, y: 36 };
+  const master = { x: 190, y: 135, alive: true };
+  const slaves = [0, 1, 2, 3, 4].map(i => ({ x: 70 + i * 60, y: 262, alive: true }));
+  const peers = [0, 1, 2, 3, 4, 5].map(i => { const [x, y] = ringXY(570, 195, 88, i / 6); return { x, y, alive: true }; });
+  const gE = S('g', {}, s), gN = S('g', {}, s), fx = S('g', {}, s);
+  S('line', { x1: 380, y1: 10, x2: 380, y2: 325, class: 'edge', 'stroke-dasharray': '6 6' }, gE);
+  slaves.forEach(p => S('line', { x1: master.x, y1: master.y, x2: p.x, y2: p.y, class: 'edge' }, gE));
+  S('line', { x1: cL.x, y1: cL.y, x2: master.x, y2: master.y, class: 'edge', 'stroke-dasharray': '3 4' }, gE);
+  peers.forEach((p, i) => {
+    peers.forEach((q, j) => { if (j > i) S('line', { x1: p.x, y1: p.y, x2: q.x, y2: q.y, class: 'edge', opacity: .45 }, gE); });
+  });
+  function node(p, label, fill) {
+    const g = S('g', { class: 'nd' }, gN);
+    const c = S('circle', { cx: p.x, cy: p.y, r: 21 }, g);
+    if (fill) c.style.fill = fill;
+    T(g, p.x, p.y + 5, label);
+    p.g = g;
+  }
+  function client(p) {
+    const g = S('g', {}, gN);
+    const r = S('rect', { x: p.x - 38, y: p.y - 15, width: 76, height: 28, rx: 6 }, g);
+    r.style.fill = C.card; r.style.stroke = C.ink; r.style.strokeWidth = 2;
+    T(g, p.x, p.y + 5, 'klienci', { 'font-size': 12, 'font-weight': 700 });
+  }
+  client(cL); client(cR);
+  node(master, 'M', C.accent2);
+  slaves.forEach((p, i) => node(p, 'S' + (i + 1)));
+  peers.forEach((p, i) => node(p, String.fromCharCode(65 + i)));
+  T(gN, 190, 327, 'master–slave', { 'font-size': 13, 'font-weight': 800 });
+  T(gN, 570, 327, 'masterless (peer-to-peer)', { 'font-size': 13, 'font-weight': 800 });
+
+  let timer = null, crashed = false, okL = 0, okR = 0, failL = 0;
+  function pulse() {
+    flyDot(fx, cL.x, cL.y + 14, master.x, master.y - 21, { ms: 420, color: C.accent }).then(() => {
+      if (!master.alive) { failL++; floatText(fx, master.x + 26, master.y - 16, '✗', C.bad); status(); return; }
+      okL++;
+      slaves.forEach(p => flyDot(fx, master.x, master.y, p.x, p.y, { ms: 480, color: C.accent, r: 4 }));
+      status();
+    });
+    const live = peers.filter(p => p.alive);
+    const coord = pick(live);
+    const start = Math.floor(Math.random() * 6);
+    const reps = [0, 1, 2].map(k => peers[(start + k) % 6]);
+    flyDot(fx, cR.x, cR.y + 14, coord.x, coord.y, { ms: 420, color: C.ok }).then(() => {
+      okR++;
+      reps.forEach(p => {
+        if (p === coord) return;
+        if (!p.alive) { floatText(fx, coord.x + 22, coord.y - 20, '📝'); return; }
+        flyDot(fx, coord.x, coord.y, p.x, p.y, { ms: 480, color: C.ok, r: 4 });
+      });
+      status();
+    });
+  }
+  function status() {
+    if (!crashed) {
+      stL.className = 'status st-left'; stL.innerHTML = `Master–slave: ${okL} zapisów przez jeden węzeł M. Każdy zapis czeka w tej samej kolejce.`;
+      stR.className = 'status st-right'; stR.innerHTML = `Cassandra: ${okR} zapisów, koordynatorem jest za każdym razem inny węzeł.`;
+    } else {
+      stL.className = 'status st-left bad'; stL.innerHTML = `❌ Master padł: ${failL} odrzuconych zapisów. Czekamy na failover (sekundy–minuty) i modlimy się, żeby nie było split-brain.`;
+      stR.className = 'status st-right ok'; stR.innerHTML = `✅ Węzeł C padł, a zapisy płyną dalej (${okR}). Brakujące kopie dla C koordynatorzy zapamiętują jako hinty 📝.`;
+    }
+  }
+  function toggle() {
+    crashed = !crashed;
+    master.alive = !crashed; peers[2].alive = !crashed;
+    master.g.classList.toggle('dead', crashed); peers[2].g.classList.toggle('dead', crashed);
+    btn.textContent = crashed ? '🔄 Przywróć' : '💥 Wyłącz węzeł';
+    failL = 0; status();
+  }
+  btn.onclick = toggle;
+  status();
+  registerFig(root, {
+    first() { setTimeout(() => { if (!crashed) toggle(); }, 4000); },
+    enter() { pulse(); timer = setInterval(pulse, 950); },
+    leave() { clearInterval(timer); }
+  });
+})();
+
+/* ---------- 2. token ring ---------- */
+(() => {
+  const root = $('#fig-ring'), s = $('svg', root), tbody = $('tbody', root), stats = $('.stats', root);
+  const input = $('input', root), btnNode = $('[data-act=node]', root);
+  const CX = 210, CY = 210, R = 150;
+  const base = [{ n: 'A', t: .04 }, { n: 'B', t: .2 }, { n: 'C', t: .36 }, { n: 'D', t: .52 }, { n: 'E', t: .7 }, { n: 'F', t: .86 }];
+  const G = { n: 'G', t: .61 };
+  let nodes = [...base];
+  const colorOf = n => COLORS['ABCDEFG'.indexOf(n)];
+  const owner = (f, ns = nodes) => { const so = [...ns].sort((a, b) => a.t - b.t); return so.find(x => x.t >= f) || so[0]; };
+  S('circle', { cx: CX, cy: CY, r: R, class: 'ring-base' }, s);
+  const gArcs = S('g', {}, s), gKeys = S('g', {}, s), gNodes = S('g', {}, s), fx = S('g', {}, s);
+  // wrap-around marker at the top
+  S('line', { x1: CX, y1: CY - R - 12, x2: CX, y2: CY - R + 12, stroke: 'var(--ink)', 'stroke-width': 2 }, s);
+  T(s, CX, CY - R - 18, '−2⁶³ | 2⁶³−1', { class: 'small', 'font-weight': 700 });
+  T(s, CX, CY - 8, 'token = Murmur3(', { class: 'small' });
+  T(s, CX, CY + 8, 'klucz partycji)', { class: 'small' });
+  T(s, CX, CY + 30, '↻ zgodnie z zegarem', { class: 'small hand-ish', 'font-weight': 700 }).style.fill = C.accent2;
+
+  function drawArcs() {
+    gArcs.innerHTML = '';
+    const so = [...nodes].sort((a, b) => a.t - b.t);
+    so.forEach((nd, i) => {
+      const prev = so[(i - 1 + so.length) % so.length];
+      const p = S('path', { d: arcD(CX, CY, R, prev.t, nd.t), class: 'arc' }, gArcs);
+      p.style.stroke = colorOf(nd.n);
+    });
+  }
+  function drawNodes() {
+    gNodes.innerHTML = '';
+    nodes.forEach(nd => {
+      const [x, y] = ringXY(CX, CY, R, nd.t);
+      const g = S('g', { class: 'nd' }, gNodes);
+      const c = S('circle', { cx: x, cy: y, r: 17 }, g);
+      c.style.fill = colorOf(nd.n);
+      T(g, x, y + 5, nd.n, { class: 'light' });
+      nd.g = g;
+    });
+  }
+  drawArcs(); drawNodes();
+
+  const keys = [];
+  const chip = n => `<span class="chip" style="background:${colorOf(n)}">${n}</span>`;
+  function row(k) {
+    const tr = H('tr', 'flash', `<td><code>${k.k.replace(/[<&]/g, '')}</code></td><td style="font-family:var(--mono);font-size:12px">${fmtToken(k.f)}</td><td>${chip(k.o)}</td>`, tbody);
+    k.tr = tr;
+  }
+  async function addKey(raw, animate = true) {
+    const k = raw.trim().slice(0, 24);
+    if (!k || keys.some(x => x.k === k)) return;
+    const f = frac(k), o = owner(f);
+    const key = { k, f, o: o.n };
+    keys.push(key);
+    const near = keys.filter(o => o !== key && Math.min(Math.abs(o.f - f), 1 - Math.abs(o.f - f)) < .035).length;
+    const [x, y] = ringXY(CX, CY, R, f), [lx, ly] = ringXY(CX, CY, R + 30 + near * 14, f);
+    key.dot = S('circle', { cx: x, cy: y, r: 5.5, class: 'kdot' }, gKeys);
+    key.dot.style.fill = colorOf(o.n); key.dot.style.opacity = 0;
+    key.lbl = T(gKeys, lx, ly + 4, k, { class: 'klbl' }); key.lbl.style.opacity = 0;
+    if (animate) await flyDot(fx, CX, CY, x, y, { ms: 500, color: C.ink, r: 5 });
+    key.dot.style.opacity = 1; key.lbl.style.opacity = 1;
+    if (animate) { await runAlong(fx, CX, CY, R, f, o.t, { color: colorOf(o.n) }); pulseG(o.g); }
+    row(key);
+  }
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { addKey(input.value); input.value = ''; } });
+  $('[data-act=add]', root).onclick = () => { addKey(input.value || 'klucz-' + Math.floor(Math.random() * 1000)); input.value = ''; };
+
+  // hash mod N vs consistent hashing over many synthetic keys
+  const synth = Array.from({ length: 10000 }, (_, i) => 'key' + i);
+  const modMoved = synth.filter(k => h32(k) % 6 !== h32(k) % 7).length / synth.length;
+  const chMoved = synth.filter(k => owner(frac(k), base).n !== owner(frac(k), [...base, G]).n).length / synth.length;
+  let busy = false;
+  async function toggleG() {
+    if (busy) return; busy = true;
+    const adding = !nodes.includes(G);
+    nodes = adding ? [...base, G] : [...base];
+    drawArcs(); drawNodes();
+    if (adding) pulseG(G.g);
+    let moved = 0;
+    for (const k of keys) {
+      const o = owner(k.f);
+      if (o.n === k.o) continue;
+      moved++;
+      await runAlong(fx, CX, CY, R, k.f, o.t, { color: colorOf(o.n), ms: 700 });
+      k.o = o.n; k.dot.style.fill = colorOf(o.n);
+      k.tr.lastElementChild.innerHTML = chip(o.n);
+      k.tr.classList.remove('flash'); void k.tr.offsetWidth; k.tr.classList.add('flash');
+      pulseG(o.g);
+    }
+    const modK = keys.filter(k => h32(k.k) % 6 !== h32(k.k) % 7).length;
+    stats.className = 'status stats ok';
+    stats.innerHTML = adding
+      ? `<b>Consistent hashing:</b> przeprowadziło się ${moved} z ${keys.length} kluczy (na 10 000 kluczy: <b>${(chMoved * 100).toFixed(1)}%</b> — tylko część zakresu E).<br>
+         <b>hash mod N</b> (6→7 serwerów): przeprowadziłoby się ${modK} z ${keys.length} (na 10 000: <b>${(modMoved * 100).toFixed(1)}%</b>).`
+      : `G usunięty: jego klucze wróciły do następnego węzła zgodnie z zegarem (E). Nikt inny nie został ruszony.`;
+    btnNode.textContent = adding ? '➖ Usuń węzeł G' : '➕ Dodaj węzeł G';
+    busy = false;
+  }
+  btnNode.onclick = toggleG;
+  registerFig(root, {
+    async first() { for (const k of ['ala', 'jan', 'ola', 'piotr', 'zosia', 'kuba', 'ewa', 'marek', 'basia', 'tomek']) await addKey(k); }
+  });
+})();
+
+/* ---------- 3. vnodes ---------- */
+(() => {
+  const root = $('#fig-vnodes'), s = $('svg', root), bars = $('.vbars', root), text = $('.vtext', root);
+  const btnKill = $('[data-act=kill]', root);
+  const CX = 200, CY = 200, R = 150, NAMES = ['A', 'B', 'C', 'D'];
+  const single = [{ n: 0, t: .08 }, { n: 1, t: .30 }, { n: 2, t: .46 }, { n: 3, t: .83 }];
+  const vn = [];
+  for (let n = 0; n < 4; n++) for (let j = 0; j < 8; j++) vn.push({ n, t: frac(`vnode-${n}-${j}`) });
+  let mode = 'single', removed = false;
+  const tokens = (m = mode, rm = removed) => {
+    let ts = m === 'single' ? single : vn;
+    if (rm) ts = ts.filter(x => x.n !== 3);
+    return [...ts].sort((a, b) => a.t - b.t);
+  };
+  const ownership = ts => {
+    const o = [0, 0, 0, 0];
+    ts.forEach((x, i) => { const p = ts[(i - 1 + ts.length) % ts.length]; let d = x.t - p.t; if (d <= 0) d += 1; o[x.n] += d; });
+    return o;
+  };
+  S('circle', { cx: CX, cy: CY, r: R, class: 'ring-base' }, s);
+  const g = S('g', {}, s);
+  const legend = S('g', {}, s);
+  NAMES.forEach((n, i) => {
+    const c = S('circle', { cx: 150 + i * 34, cy: 200, r: 9 }, legend); c.style.fill = COLORS[i];
+    T(legend, 150 + i * 34, 224, n, { class: 'small', 'font-weight': 800 });
+  });
+  function render() {
+    g.innerHTML = '';
+    const ts = tokens();
+    ts.forEach((x, i) => {
+      const p = ts[(i - 1 + ts.length) % ts.length];
+      const path = S('path', { d: arcD(CX, CY, R, p.t, x.t), class: 'arc draw', pathLength: 1 }, g);
+      path.style.stroke = COLORS[x.n]; path.style.opacity = .85; path.style.strokeWidth = 22;
+      path.style.animationDelay = (i * 0.025) + 's';
+      const [x0, y0] = ringXY(CX, CY, R - 16, x.t), [x1, y1] = ringXY(CX, CY, R + 16, x.t);
+      S('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: 'var(--ink)', 'stroke-width': 1.5 }, g);
+    });
+    const own = ownership(ts), before = ownership(tokens(mode, false));
+    bars.innerHTML = NAMES.map((n, i) => {
+      const gone = removed && i === 3;
+      const delta = removed && !gone ? own[i] - before[i] : 0;
+      return `<div class="row"><span>${n}${gone ? ' 💀' : ''}</span><span style="flex:1;margin:0 .5rem;background:var(--card);border-radius:4px;overflow:hidden">
+        <span style="display:block;height:14px;width:${(own[i] * 100).toFixed(1)}%;background:${COLORS[i]};transition:width .5s"></span></span>
+        <b>${gone ? '—' : (own[i] * 100).toFixed(1) + '%'}</b>${delta > 0.001 ? ` <span style="color:var(--pen)">&nbsp;+${(delta * 100).toFixed(1)}</span>` : ''}</div>`;
+    }).join('');
+    const live = own.filter((_, i) => !(removed && i === 3));
+    const ratio = Math.max(...live) / Math.min(...live);
+    if (!removed) {
+      text.className = 'status vtext';
+      text.innerHTML = mode === 'single'
+        ? `Jeden token na węzeł: najbardziej obciążony ma <b>${ratio.toFixed(1)}×</b> więcej danych niż najmniej obciążony. Teraz usuń D.`
+        : `Vnodes: rozrzut obciążenia tylko <b>${ratio.toFixed(2)}×</b>. Każdy węzeł ma 8 małych kawałków pierścienia.`;
+    } else {
+      const heirs = [0, 1, 2].filter(i => own[i] - ownership(tokens(mode, false))[i] > 0.001);
+      text.className = 'status vtext ' + (heirs.length > 1 ? 'ok' : 'bad');
+      text.innerHTML = heirs.length > 1
+        ? `Dane D rozeszły się po <b>${heirs.length}</b> węzłach (${heirs.map(i => NAMES[i]).join(', ')}). Odbudowa i przejęcie obciążenia rozkładają się równo — każdy streamuje po trochu.`
+        : `Całe ${(ownership(tokens(mode, false))[3] * 100).toFixed(0)}% danych D spada na <b>jednego</b> sąsiada (${NAMES[heirs[0]]}). On sam musi przyjąć ruch i streamować dane — wąskie gardło.`;
+    }
+  }
+  $$('[data-mode]', root).forEach(b => b.onclick = () => {
+    mode = b.dataset.mode;
+    $$('[data-mode]', root).forEach(x => x.classList.toggle('on', x === b));
+    render();
+  });
+  btnKill.onclick = () => { removed = !removed; btnKill.textContent = removed ? '↩ Przywróć D' : '💥 Usuń węzeł D'; render(); };
+  render();
+  registerFig(root, {
+    first() {
+      setTimeout(() => { if (mode === 'single') $('[data-mode=vnodes]', root).click(); }, 2600);
+    }
+  });
+})();
+
+/* ---------- 4. replication ---------- */
+(() => {
+  const root = $('#fig-repl'), s = $('svg', root), log = $('.rlog', root), input = $('input', root);
+  const CX = 200, CY = 200, R = 145;
+  const DCS = [1, 1, 2, 1, 2, 2, 1, 2];
+  const nodes = DCS.map((dc, i) => ({ name: 'N' + (i + 1), t: (i + .5) / 8, dc }));
+  let strat = 'simple', runId = 0;
+  S('circle', { cx: CX, cy: CY, r: R, class: 'ring-base' }, s);
+  const gN = S('g', {}, s), gB = S('g', {}, s), fx = S('g', {}, s);
+  const center = T(s, CX, CY + 5, '', { 'font-weight': 800 });
+  function drawNodes() {
+    gN.innerHTML = '';
+    nodes.forEach(nd => {
+      const [x, y] = ringXY(CX, CY, R, nd.t);
+      const g = S('g', { class: 'nd' }, gN);
+      const c = S('circle', { cx: x, cy: y, r: 20 }, g);
+      if (strat === 'nts') c.style.fill = nd.dc === 1 ? C.accent : C.accent2;
+      const t = T(g, x, y + 5, nd.name);
+      if (strat === 'nts') t.classList.add('light');
+      if (strat === 'nts') { const [lx, ly] = ringXY(CX, CY, R - 36, nd.t); T(g, lx, ly + 4, 'DC' + nd.dc, { class: 'tiny', 'font-weight': 700 }); }
+      nd.g = g;
+    });
+  }
+  const val = k => +$(`[data-k=${k}]`, root).value;
+  async function place() {
+    const my = ++runId;
+    gB.innerHTML = ''; fx.innerHTML = ''; log.innerHTML = '';
+    drawNodes();
+    const key = (input.value || 'user:42').slice(0, 24);
+    const f = frac(key);
+    center.textContent = key;
+    const need = strat === 'simple' ? { all: val('rf') } : { 1: val('rf1'), 2: val('rf2') };
+    const total = strat === 'simple' ? need.all : need[1] + need[2];
+    const [kx, ky] = ringXY(CX, CY, R, f);
+    await flyDot(fx, CX, CY, kx, ky, { color: C.ink, ms: 500 });
+    const kd = S('circle', { cx: kx, cy: ky, r: 6 }, gB); kd.style.fill = C.ink;
+    H('li', '', `klucz <code>${key.replace(/[<&]/g, '')}</code> → token ${fmtToken(f)}`, log).style.listStyle = 'none';
+    let start = nodes.findIndex(n => n.t >= f); if (start < 0) start = 0;
+    const chosen = [], count = { 1: 0, 2: 0 };
+    let pos = f;
+    for (let step = 0; step < nodes.length && chosen.length < total; step++) {
+      if (my !== runId) return;
+      const nd = nodes[(start + step) % nodes.length];
+      await runAlong(fx, CX, CY, R, pos, nd.t, { ms: 450 });
+      if (my !== runId) return;
+      pos = nd.t;
+      const [bx, by] = ringXY(CX, CY, R + 34, nd.t);
+      const take = strat === 'simple' || count[nd.dc] < need[nd.dc];
+      if (take) {
+        chosen.push(nd); count[nd.dc]++;
+        const b = S('g', {}, gB);
+        const c = S('circle', { cx: bx, cy: by, r: 12 }, b); c.style.fill = C.ok; c.style.stroke = C.ink; c.style.strokeWidth = 2;
+        T(b, bx, by + 4, chosen.length, { class: 'light small', 'font-weight': 800 });
+        pulseG(nd.g);
+        H('li', '', `<b>#${chosen.length} ${nd.name}</b>${strat === 'nts' ? ` (DC${nd.dc})` : ''} — ${chosen.length === 1 ? 'pierwsza replika: właściciel zakresu tokena' : `replika nr ${chosen.length}`}`, log);
+      } else {
+        T(gB, bx, by + 5, '✗', { 'font-weight': 800 }).style.fill = C.mut;
+        H('li', 'mut', `✗ ${nd.name} (DC${nd.dc}) — pomijam: DC${nd.dc} ma już ${need[nd.dc]} ${need[nd.dc] === 1 ? 'replikę' : 'repliki'}`, log).style.listStyle = 'none';
+      }
+    }
+    H('li', '', `✅ ${chosen.length} replik${strat === 'nts' ? `: dc1=${count[1]}, dc2=${count[2]}` : ''}. Koordynator wyśle zapis do wszystkich naraz.`, log).style.listStyle = 'none';
+  }
+  $$('[data-strat]', root).forEach(b => b.onclick = () => {
+    strat = b.dataset.strat;
+    $$('[data-strat]', root).forEach(x => x.classList.toggle('on', x === b));
+    $$('.rf-simple', root).forEach(x => x.hidden = strat !== 'simple');
+    $$('.rf-nts', root).forEach(x => x.hidden = strat !== 'nts');
+    place();
+  });
+  $$('select', root).forEach(x => x.onchange = place);
+  $('[data-act=place]', root).onclick = place;
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') place(); });
+  drawNodes();
+  registerFig(root, { first: place });
+})();
+
+/* ---------- 5. gossip ---------- */
+(() => {
+  const root = $('#fig-gossip'), cv = $('#g-canvas'), ctx = cv.getContext('2d');
+  const chart = $('.g-chart', root), info = $('.g-info', root), phiFill = $('.meter .fill', root), phiTxt = $('.phi-txt', root);
+  const btnKill = $('[data-act=kill]', root);
+  const N = 32, HGT = 340;
+  let W = 0, pos = [];
+  const informed = new Uint8Array(N), alive = new Uint8Array(N).fill(1);
+  let src = 0, round = 0, hist = [], done = false, idle = 0, exchanges = [], dead = -1, silence = 0, timer = null;
+  function layout() {
+    const dpr = devicePixelRatio || 1;
+    W = cv.clientWidth || 600;
+    cv.width = W * dpr; cv.height = HGT * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const rad = Math.min(W, HGT) / 2 - 22, sx = Math.min(1.7, (W / 2 - 22) / rad);
+    pos = Array.from({ length: N }, (_, i) => {
+      const r = Math.sqrt((i + .5) / N) * rad, a = i * 2.39996;
+      return [W / 2 + r * Math.cos(a) * sx, HGT / 2 + r * Math.sin(a)];
+    });
+  }
+  const liveIdx = () => [...Array(N).keys()].filter(i => alive[i]);
+  function newRumor() {
+    informed.fill(0);
+    src = pick(liveIdx()); informed[src] = 1;
+    round = 0; hist = [1]; done = false; exchanges = [];
+    renderChart(); draw(); infoText();
+  }
+  function tick() {
+    if (dead >= 0) silence++;
+    if (done) { if (++idle >= 4) newRumor(); else draw(); updatePhi(); return; }
+    round++;
+    const snap = Uint8Array.from(informed), live = liveIdx();
+    exchanges = [];
+    for (const i of live) {
+      let j = i;
+      while (j === i && live.length > 1) j = pick(live);
+      const spread = snap[i] || snap[j];
+      exchanges.push([i, j, spread && !(snap[i] && snap[j])]);
+      if (spread) { informed[i] = 1; informed[j] = 1; }
+    }
+    const cnt = live.filter(i => informed[i]).length;
+    hist.push(cnt);
+    if (cnt === live.length) { done = true; idle = 0; }
+    renderChart(); updatePhi(); draw(); infoText();
+  }
+  function infoText() {
+    const live = liveIdx().length, cnt = liveIdx().filter(i => informed[i]).length;
+    info.className = 'g-info status' + (done ? ' ok' : '');
+    info.innerHTML = done
+      ? `Wszyscy (${live}) wiedzą po <b>${round}</b> rundach (~${round} s). Dla porównania log₂(${live}) ≈ ${Math.log2(live).toFixed(1)}.`
+      : `Runda <b>${round}</b>: wie ${cnt} z ${live} węzłów.`;
+  }
+  function renderChart() {
+    chart.innerHTML = hist.slice(-14).map(v => `<div style="height:${(v / N * 100).toFixed(0)}%"></div>`).join('');
+  }
+  function updatePhi() {
+    if (dead < 0) { phiFill.style.width = '0'; phiTxt.textContent = 'Zabij węzeł, żeby zobaczyć, jak rośnie podejrzenie.'; return; }
+    const phi = silence / Math.LN10; // heartbeat every ~1 s, exponential inter-arrival model
+    phiFill.style.width = Math.min(100, phi / 12 * 100) + '%';
+    phiFill.style.background = phi >= 8 ? C.bad : phi >= 4 ? C.warn : C.ok;
+    phiTxt.innerHTML = phi >= 8
+      ? `φ = <b>${phi.toFixed(1)}</b> ≥ 8 → węzeł uznany za <b style="color:var(--bad)">DOWN</b> po ${silence} s ciszy. Koordynatorzy zaczynają pisać dla niego hinty.`
+      : `Cisza od ${silence} s, φ = <b>${phi.toFixed(1)}</b> (próg phi_convict_threshold = 8).`;
+  }
+  function draw() {
+    if (!W) return;
+    ctx.clearRect(0, 0, W, HGT);
+    ctx.lineWidth = 1.5;
+    for (const [i, j, spread] of exchanges) {
+      ctx.strokeStyle = spread ? C.accent2 : C.line;
+      ctx.globalAlpha = spread ? .95 : .7;
+      ctx.lineWidth = spread ? 2.5 : 1.2;
+      ctx.beginPath(); ctx.moveTo(...pos[i]); ctx.lineTo(...pos[j]); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    const phi = silence / Math.LN10;
+    pos.forEach(([x, y], i) => {
+      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2);
+      ctx.fillStyle = !alive[i] ? C.dim : informed[i] ? C.accent2 : C.paper2;
+      ctx.fill();
+      ctx.lineWidth = i === src ? 4 : 2;
+      ctx.strokeStyle = !alive[i] && phi >= 8 ? C.bad : C.ink;
+      ctx.stroke();
+      if (!alive[i]) { ctx.fillStyle = C.bad; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillText(phi >= 8 ? 'DOWN' : '?', x, y - 13); }
+    });
+  }
+  $('[data-act=rumor]', root).onclick = newRumor;
+  btnKill.onclick = () => {
+    if (dead >= 0) { alive[dead] = 1; dead = -1; silence = 0; done = false; btnKill.textContent = '💀 Zabij węzeł'; }
+    else { dead = pick(liveIdx().filter(i => i !== src)); alive[dead] = 0; informed[dead] = 0; silence = 0; btnKill.textContent = '🩺 Ożyw węzeł'; }
+    updatePhi(); draw();
+  };
+  addEventListener('resize', () => { layout(); draw(); });
+  layout(); newRumor();
+  registerFig(root, {
+    enter() { layout(); draw(); clearInterval(timer); timer = setInterval(tick, REDUCE ? 1500 : 750); },
+    leave() { clearInterval(timer); }
+  });
+})();
+
+/* ---------- 6. write path ---------- */
+(() => {
+  const root = $('#fig-write'), stage = $('.wp-stage', root), log = $('.wp-log', root);
+  const client = $('#wp-client'), coord = $('#wp-coord'), mem = $('#wp-mem'), memList = $('#wp-mem ul');
+  const cl = $('#wp-cl'), clList = $('#wp-cl .cl-list'), sst = $('#wp-sst'), sstList = $('#wp-sst .sst-list');
+  const pool = [[7, 'Zosia'], [3, 'Kuba'], [12, 'Ala'], [5, 'Ewa'], [7, 'Zofia'], [9, 'Marek'], [3, 'Jakub'], [1, 'Ola'], [12, 'Alicja'], [4, 'Piotr'], [8, 'Basia'], [2, 'Tomek']];
+  let pi = 0, ts = 1000, sstN = 0, pending = 0, queue = Promise.resolve();
+  const memtable = new Map();
+  const say = h => { log.innerHTML = h; };
+  function chip(from, to, text, cls = '') {
+    const sr = stage.getBoundingClientRect(), a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+    const c = H('div', 'chip-fly ' + cls, text, stage);
+    const x0 = a.left - sr.left + a.width / 2, y0 = a.top - sr.top + a.height / 2;
+    const x1 = b.left - sr.left + b.width / 2, y1 = b.top - sr.top + b.height / 2;
+    c.style.left = x0 + 'px'; c.style.top = y0 + 'px';
+    return tween(650, k => { c.style.transform = `translate(calc(-50% + ${(x1 - x0) * k}px), calc(-50% + ${(y1 - y0) * k}px))`; })
+      .then(() => c.remove());
+  }
+  function renderMem(hl) {
+    memList.innerHTML = [...memtable.entries()].sort((a, b) => a[0] - b[0]).map(([k, v]) =>
+      `<li class="${k === hl ? 'hl' : ''}">id=${k} → ${v.val === null ? '🪦 tombstone' : `'${v.val}'`} <span class="mut">· ts ${v.ts}</span></li>`).join('');
+  }
+  async function doWrite(id, val) {
+    const myTs = ++ts;
+    const cql = val === null ? `DELETE FROM users WHERE id=${id}` : `INSERT INTO users (id, name) VALUES (${id}, '${val}')`;
+    say(`➡️ Klient wysyła <code>${cql}</code> do dowolnego węzła — ten zostaje <b>koordynatorem</b> i przekazuje zapis do replik (tu: jedna replika).`);
+    await chip(client, coord, val === null ? `🪦 id=${id}` : `✉️ id=${id}`);
+    say('📜 Krok 1: <b>commit log</b> — dopisanie na koniec pliku. Sekwencyjny zapis, żadnego szukania po dysku.');
+    await chip(coord, cl, '📜 append');
+    H('span', 'cl-e' + (val === null ? ' tomb' : ''), `${id}${val === null ? '🪦' : ''}`, clList).title = cql;
+    say('🧠 Krok 2: <b>memtable</b> w RAM, posortowana po kluczu. Nie sprawdzamy, czy wiersz istniał — to zawsze <b>upsert</b>.');
+    await chip(cl, mem, '🧠 insert');
+    const existed = memtable.has(id);
+    memtable.set(id, { val, ts: myTs });
+    renderMem(id);
+    await chip(mem, coord, '✔ ack', 'ok');
+    await chip(coord, client, '✔ OK', 'ok');
+    say(existed
+      ? `✅ Zapisane. Klucz id=${id} był już w memtable — nowsza wersja (ts ${myTs}) po prostu go nadpisała. Na dysku nic nie zmieniono.`
+      : `✅ Zapis potwierdzony po dwóch tanich operacjach. ${val === null ? 'Zauważ: DELETE też jest zapisem — tombstone.' : ''}`);
+    if (memtable.size >= 5) { await sleep(500); await flush(); }
+  }
+  async function flush() {
+    if (!memtable.size) return;
+    say('💾 Memtable pełna → <b>flush</b>: cała posortowana zawartość trafia sekwencyjnie do <b>nowego</b> pliku SSTable.');
+    mem.classList.add('flushing');
+    await chip(mem, sst, '💾 flush');
+    sstN++;
+    H('div', 'sst-card pop', `<b>SSTable-${sstN}</b> 🔒<div class="rows">${[...memtable.entries()].sort((a, b) => a[0] - b[0])
+      .map(([k, v]) => `<span title="ts ${v.ts}">${k}${v.val === null ? '🪦' : ''}</span>`).join('')}</div>`, sstList);
+    memtable.clear(); renderMem();
+    mem.classList.remove('flushing');
+    $$('.cl-e', clList).forEach(e => e.classList.add('gone'));
+    await sleep(700);
+    clList.innerHTML = '';
+    const cards = $$('.sst-card', sstList);
+    if (cards.length > 4) cards[0].remove();
+    say(`🧹 Segment commit logu zwolniony (dane są już trwale w SSTable-${sstN}). ${sstN >= 2 ? 'Klucz może teraz leżeć w kilku SSTables naraz — posprząta to <b>kompakcja</b> (rozdział 9).' : ''}`);
+  }
+  function enqueue(fn) {
+    if (pending >= 3) return;
+    pending++;
+    queue = queue.then(fn).catch(e => console.error(e)).finally(() => pending--);
+  }
+  $('[data-act=insert]', root).onclick = () => { const [id, v] = pool[pi++ % pool.length]; enqueue(() => doWrite(id, v)); };
+  $('[data-act=delete]', root).onclick = () => {
+    const ids = memtable.size ? [...memtable.keys()] : pool.map(p => p[0]);
+    const id = pick(ids); enqueue(() => doWrite(id, null));
+  };
+  $('[data-act=flush]', root).onclick = () => enqueue(flush);
+  $('[data-act=reset]', root).onclick = () => enqueue(async () => {
+    memtable.clear(); renderMem(); clList.innerHTML = ''; sstList.innerHTML = ''; sstN = 0; pi = 0; say('Wyczyszczone. Kliknij INSERT.');
+  });
+  registerFig(root, {
+    first() { for (let i = 0; i < 3; i++) { const [id, v] = pool[pi++]; enqueue(() => doWrite(id, v)); } }
+  });
+})();
+
+/* ---------- 7. consistency lab ---------- */
+(() => {
+  const root = $('#fig-cons'), s = $('svg', root), facts = $('.facts', root), st = $('.cstatus', root);
+  const cli = { x: 45, y: 165 }, co = { x: 190, y: 165 };
+  const reps = Array.from({ length: 5 }, () => ({ up: true, v: 0, hints: 0, missed: 0 }));
+  let version = 0, lastAcked = 0, busy = false;
+  const gE = S('g', {}, s), gN = S('g', {}, s), fx = S('g', {}, s);
+  const get = k => $(`[data-k=${k}]`, root);
+  const rf = () => +get('rf').value;
+  const need = cl => { const q = Math.floor(rf() / 2) + 1; return { ANY: 1, ONE: 1, TWO: 2, THREE: 3, QUORUM: q, ALL: rf() }[cl]; };
+  const repl = n => `${n} ${n === 1 ? 'replika' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'repliki' : 'replik'}`;
+  const repPos = i => ({ x: 450, y: 165 + (i - (rf() - 1) / 2) * 62 });
+  const status = (html, cls = '') => { st.className = 'status cstatus ' + cls; st.innerHTML = html; };
+  let coordText, hintText;
+  function render() {
+    gE.innerHTML = ''; gN.innerHTML = '';
+    S('line', { x1: cli.x, y1: cli.y, x2: co.x, y2: co.y, class: 'edge' }, gE);
+    const cg = S('g', {}, gN);
+    const r = S('rect', { x: cli.x - 34, y: cli.y - 18, width: 68, height: 36, rx: 6 }, cg);
+    r.style.fill = C.card; r.style.stroke = C.ink; r.style.strokeWidth = 2;
+    T(cg, cli.x, cli.y + 5, 'klient', { class: 'small', 'font-weight': 700 });
+    const g = S('g', { class: 'nd' }, gN);
+    const c = S('circle', { cx: co.x, cy: co.y, r: 30 }, g); c.style.fill = C.accent2;
+    T(g, co.x, co.y + 4, 'koord.', { class: 'small' });
+    co.g = g;
+    coordText = T(gN, co.x, co.y + 50, '', { class: 'small', 'font-weight': 700 });
+    hintText = T(gN, co.x, co.y - 42, '', { 'font-size': 13 });
+    for (let i = 0; i < rf(); i++) {
+      const p = repPos(i);
+      S('line', { x1: co.x, y1: co.y, x2: p.x, y2: p.y, class: 'edge' }, gE);
+      const rg = S('g', { class: 'nd clickable' + (reps[i].up ? '' : ' dead') }, gN);
+      rg.setAttribute('role', 'button'); rg.setAttribute('aria-label', `replika R${i + 1}`);
+      const rc = S('circle', { cx: p.x, cy: p.y, r: 22 }, rg);
+      if (reps[i].up) rc.style.fill = C.paper2;
+      T(rg, p.x, p.y + 5, 'R' + (i + 1));
+      const vt = T(gN, p.x + 36, p.y + 5, '', { 'text-anchor': 'start', 'font-weight': 800 });
+      reps[i].g = rg; reps[i].vt = vt;
+      rg.onclick = () => toggleRep(i);
+    }
+    renderVals(); analyse();
+  }
+  function renderVals() {
+    for (let i = 0; i < rf(); i++) {
+      const r = reps[i];
+      if (!r.vt) continue;
+      r.vt.textContent = `v${r.v}${r.up ? '' : ' 💤'}`;
+      r.vt.style.fill = r.v < version ? C.bad : C.ok;
+    }
+    const h = reps.slice(0, rf()).reduce((a, r) => a + r.hints, 0);
+    if (hintText) hintText.textContent = h ? `📝 hinty: ${h}` : '';
+  }
+  async function toggleRep(i) {
+    reps[i].up = !reps[i].up;
+    render();
+    if (reps[i].up && reps[i].hints && get('hh').checked) {
+      status(`R${i + 1} wraca. Gossip to ogłasza, koordynator odtwarza ${reps[i].hints} hint(y) → R${i + 1} dogania do v${reps[i].missed}.`, 'ok');
+      const p = repPos(i);
+      await flyDot(fx, co.x, co.y, p.x, p.y, { color: C.accent2, ms: 700, r: 7 });
+      reps[i].v = Math.max(reps[i].v, reps[i].missed); reps[i].hints = 0;
+      renderVals();
+    } else if (reps[i].up && reps[i].v < version) {
+      status(`R${i + 1} wraca, ale bez hintów ma starą wersję v${reps[i].v}. Naprawi ją read repair (jeśli trafi na nią odczyt) albo nodetool repair.`, 'warn');
+    }
+  }
+  function analyse() {
+    const n = rf(), wcl = get('w').value, rcl = get('r').value, W = need(wcl), R = need(rcl);
+    const live = reps.slice(0, n).filter(r => r.up).length;
+    const q = Math.floor(n / 2) + 1;
+    const strong = wcl !== 'ANY' && R + W > n;
+    const wOk = W > n ? 'niemożliwe (CL > RF)' : (live >= W || (wcl === 'ANY' && get('hh').checked)) ? '✅ możliwy' : '❌ Unavailable';
+    const rOk = R > n ? 'niemożliwe (CL > RF)' : live >= R ? '✅ możliwy' : '❌ Unavailable';
+    facts.innerHTML = `
+      <div class="row"><span>QUORUM przy RF=${n}</span><b>⌊${n}/2⌋+1 = ${q}</b></div>
+      <div class="row"><span>W (potwierdzenia zapisu)</span><b>${wcl === 'ANY' ? '1 (może być hint)' : W}</b></div>
+      <div class="row"><span>R (repliki czytane)</span><b>${R}</b></div>
+      <div class="row"><span>żywe repliki</span><b>${live} / ${n}</b></div>
+      <div class="row"><span>zapis teraz</span><b>${wOk}</b></div>
+      <div class="row"><span>odczyt teraz</span><b>${rOk}</b></div>
+      <div class="row"><span>tolerowane awarie (zapis / odczyt)</span><b>${Math.max(0, n - W)} / ${Math.max(0, n - R)}</b></div>
+      <div class="big" style="background:${strong ? 'color-mix(in srgb, var(--ok) 20%, var(--paper2))' : 'color-mix(in srgb, var(--warn) 25%, var(--paper2))'}">
+        ${strong ? `R + W = ${R + W} &gt; ${n} → silna spójność: odczyt zawsze trafi w replikę z ostatnim potwierdzonym zapisem.`
+                 : `R + W = ${wcl === 'ANY' ? '?' : R + W} ≤ ${n} → spójność ewentualna: odczyt może zwrócić starą wartość.`}</div>`;
+  }
+  async function doWrite() {
+    if (busy) return;
+    const n = rf(), wcl = get('w').value, W = need(wcl), hh = get('hh').checked;
+    const liveI = [...Array(n).keys()].filter(i => reps[i].up);
+    if (W > n) return status(`❌ CL=${wcl} wymaga ${W} replik, a RF=${n}. Cassandra odrzuci takie zapytanie.`, 'bad');
+    if (liveI.length < W && !(wcl === 'ANY' && hh)) {
+      pulseG(co.g);
+      return status(`❌ <b>UnavailableException</b>: koordynator wie z gossipu, że żyje ${repl(liveI.length)}, a CL=${wcl} potrzebuje ${W}. Nic nie wysłano.`, 'bad');
+    }
+    busy = true;
+    const v = ++version;
+    status(`Zapis v${v}: koordynator wysyła go do <b>wszystkich</b> żywych replik (${liveI.length}), a czeka tylko na ${wcl === 'ANY' ? '1 (lub hint)' : W}.`);
+    coordText.textContent = '';
+    await flyDot(fx, cli.x, cli.y, co.x, co.y, { ms: 400 });
+    let acks = 0, answered = false;
+    const answer = txt => {
+      if (answered) return; answered = true; lastAcked = v;
+      coordText.textContent = txt; pulseG(co.g);
+      flyDot(fx, co.x, co.y, cli.x, cli.y, { color: C.ok, ms: 400 });
+    };
+    for (let i = 0; i < n; i++) if (!reps[i].up && hh) { reps[i].hints++; reps[i].missed = v; }
+    renderVals();
+    if (!liveI.length) answer('✔ OK (tylko hint!)');
+    await Promise.all(liveI.map(i => {
+      const p = repPos(i);
+      return flyDot(fx, co.x, co.y, p.x, p.y, { ms: rnd(300, 1300) })
+        .then(() => { reps[i].v = Math.max(reps[i].v, v); renderVals(); return flyDot(fx, p.x, p.y, co.x, co.y, { color: C.ok, ms: rnd(250, 700), r: 4 }); })
+        .then(() => { acks++; coordText.textContent = acks <= W ? `ack ${acks}/${W}` : `+${acks - W} spóźnione ack`; if (acks >= W) answer(`✔ OK po ${acks} ack`); });
+    }));
+    const down = n - liveI.length;
+    status(`✅ Zapis v${v} potwierdzony klientowi po ${wcl === 'ANY' && !liveI.length ? 'zapisaniu hintu' : W + ' ack'}; pozostałe żywe repliki i tak go dostały.` +
+      (down ? (hh ? ` Dla ${down} leżącej repliki koordynator zapisał hint 📝.` : ` <b>${down} leżąca replika nie dostała nic</b> (hinted handoff wyłączony).`) : ''), 'ok');
+    busy = false;
+  }
+  async function doRead() {
+    if (busy) return;
+    const n = rf(), rcl = get('r').value, R = need(rcl);
+    const liveI = [...Array(n).keys()].filter(i => reps[i].up);
+    if (R > n) return status(`❌ CL=${rcl} wymaga ${R} replik, a RF=${n}.`, 'bad');
+    if (liveI.length < R) { pulseG(co.g); return status(`❌ <b>UnavailableException</b>: żyje ${repl(liveI.length)}, CL=${rcl} potrzebuje ${R}.`, 'bad'); }
+    busy = true; coordText.textContent = '';
+    await flyDot(fx, cli.x, cli.y, co.x, co.y, { ms: 400 });
+    const chosen = shuffle(liveI).slice(0, R);
+    const res = await Promise.all(chosen.map((i, k) => {
+      const p = repPos(i);
+      return flyDot(fx, co.x, co.y, p.x, p.y, { color: k === 0 ? C.accent : C.mut, ms: rnd(300, 800), r: k === 0 ? 6 : 4 })
+        .then(() => flyDot(fx, p.x, p.y, co.x, co.y, { color: k === 0 ? C.accent : C.mut, ms: rnd(250, 600), r: k === 0 ? 6 : 4 }))
+        .then(() => ({ i, v: reps[i].v }));
+    }));
+    const maxV = Math.max(...res.map(r => r.v));
+    const stale = res.filter(r => r.v < maxV);
+    let msg = `Zapytano ${chosen.map(i => 'R' + (i + 1)).join(', ')} (pierwsza o dane, ${R > 1 ? 'reszta o digest' : 'bez digestów'}). `;
+    if (stale.length) {
+      coordText.textContent = 'digest mismatch!';
+      msg += `Digesty się różnią → <b>read repair</b>: koordynator dopisuje v${maxV} do ${stale.map(r => 'R' + (r.i + 1)).join(', ')} przed odpowiedzią. `;
+      await Promise.all(stale.map(r => { const p = repPos(r.i); return flyDot(fx, co.x, co.y, p.x, p.y, { color: C.warn, ms: 600, r: 6 }).then(() => { reps[r.i].v = maxV; renderVals(); }); }));
+    } else coordText.textContent = `v${maxV}`;
+    await flyDot(fx, co.x, co.y, cli.x, cli.y, { color: maxV < lastAcked ? C.bad : C.ok, ms: 400 });
+    if (maxV < lastAcked) status(msg + `⚠️ <b>Stary odczyt:</b> klient dostał v${maxV}, choć zapis v${lastAcked} był potwierdzony. Żadna z zapytanych replik go nie miała — to jest „eventual” w eventual consistency.`, 'warn');
+    else status(msg + `✅ Klient dostał v${maxV}${lastAcked ? ' — najnowszą potwierdzoną wersję' : ''}.`, 'ok');
+    busy = false;
+  }
+  async function doRepair() {
+    if (busy) return;
+    const n = rf(), live = [...Array(n).keys()].filter(i => reps[i].up);
+    const maxV = Math.max(...live.map(i => reps[i].v), 0);
+    busy = true;
+    await Promise.all(live.filter(i => reps[i].v < maxV).map(i => { const p = repPos(i); return flyDot(fx, co.x, co.y, p.x, p.y, { color: C.accent2, ms: 700, r: 7 }).then(() => { reps[i].v = maxV; renderVals(); }); }));
+    status(`🔧 Anti-entropy repair: żywe repliki porównały drzewa Merkle i wyrównały się do v${maxV} (rozdział 11).`, 'ok');
+    busy = false;
+  }
+  ['rf', 'w', 'r', 'hh'].forEach(k => get(k).onchange = () => { render(); });
+  $('[data-act=write]', root).onclick = doWrite;
+  $('[data-act=read]', root).onclick = doRead;
+  $('[data-act=repair]', root).onclick = doRepair;
+  render();
+  registerFig(root, { first() { setTimeout(doWrite, 600); } });
+})();
+
+/* ---------- 8a. bloom filter ---------- */
+(() => {
+  const root = $('#fig-bloom'), bitsEl = $('.bits', root), st = $('.bstatus', root), fp = $('.bfp', root), input = $('input', root);
+  const M = 32, K = 3, bits = new Uint8Array(M), set = new Set();
+  const cells = Array.from({ length: M }, (_, i) => H('div', 'bit', i, bitsEl));
+  const idx = key => [1, 2, 3].map(sd => h32(key, Math.imul(sd, 0x9e3779b1)) % M);
+  const status = (h, c = '') => { st.className = 'status bstatus ' + c; st.innerHTML = h; };
+  function paint(hl = [], cls = 'hit') {
+    cells.forEach((c, i) => { c.className = 'bit' + (bits[i] ? ' on' : ''); });
+    hl.forEach(i => cells[i].classList.add(bits[i] ? cls : 'miss'));
+    const p = Math.pow(1 - Math.exp(-K * set.size / M), K);
+    fp.innerHTML = `Kluczy w SSTable: ${set.size} (${[...set].map(k => `<code>${k}</code>`).join(' ')}). Szansa fałszywego „może”: (1 − e<sup>−kn/m</sup>)<sup>k</sup> ≈ <b>${(p * 100).toFixed(1)}%</b>`;
+  }
+  const clean = v => v.trim().slice(0, 20).replace(/[<&>"]/g, '');
+  function add(k) {
+    k = clean(k); if (!k) return;
+    set.add(k); const ix = idx(k); ix.forEach(i => bits[i] = 1); paint(ix);
+    status(`Dodano <code>${k}</code>: ustawiamy bity ${ix.join(', ')}.`);
+  }
+  function test(k) {
+    k = clean(k); if (!k) return;
+    const ix = idx(k), all = ix.every(i => bits[i]);
+    paint(ix);
+    if (!all) status(`<code>${k}</code>: bity ${ix.join(', ')} — co najmniej jeden to 0 → <b>na pewno nie ma</b>. SSTable pominięta bez dotykania dysku. ✅`, 'ok');
+    else if (set.has(k)) status(`<code>${k}</code>: wszystkie bity ${ix.join(', ')} = 1 → „może jest” — i faktycznie jest. Czytamy indeks i dane.`, 'ok');
+    else status(`<code>${k}</code>: wszystkie bity ${ix.join(', ')} = 1, ale klucza <b>nie dodano</b>! Fałszywie dodatni — zmarnowany odczyt indeksu. ⚠️`, 'warn');
+  }
+  $('[data-act=add]', root).onclick = () => add(input.value);
+  $('[data-act=test]', root).onclick = () => test(input.value);
+  $('[data-act=fp]', root).onclick = () => {
+    for (let i = 0; i < 20000; i++) {
+      const k = 'user' + i;
+      if (!set.has(k) && idx(k).every(j => bits[j])) { input.value = k; test(k); return; }
+    }
+    status('Nie znalazłem fałszywego trafienia — filtr jest jeszcze prawie pusty. Dodaj więcej kluczy.');
+  };
+  ['ala', 'jan', 'ola', 'piotr', 'ewa'].forEach(k => { set.add(k); idx(k).forEach(i => bits[i] = 1); });
+  paint();
+  registerFig(root, { first() { setTimeout(() => { input.value = 'zenon'; test('zenon'); }, 700); } });
+})();
+
+/* ---------- 8b. read path ---------- */
+(() => {
+  const root = $('#fig-readpath'), tbody = $('tbody', root), merge = $('.merge', root);
+  const rows = [
+    { src: '🧠 Memtable', bloom: '— (RAM)', idx: '— skiplist w pamięci', data: "email = 'nowy@x.pl' · ts 300" },
+    { src: 'SSTable-4 (najnowsza)', bloom: '❌ na pewno nie', idx: 'pominięta', data: '—', skip: true },
+    { src: 'SSTable-3', bloom: '⚠️ może', idx: '🔎 summary → index: brak klucza (fałszywy alarm)', data: '—', skip: true },
+    { src: 'SSTable-2', bloom: '❌ na pewno nie', idx: 'pominięta', data: '—', skip: true },
+    { src: 'SSTable-1 (najstarsza)', bloom: '✅ może', idx: '🔎 key cache miss → summary → index → offset 81 920 → blok 16 KiB', data: "name = 'Ala' · ts 100<br>email = 'ala@x.pl' · ts 120" },
+  ];
+  let run = 0;
+  async function play() {
+    const my = ++run;
+    tbody.innerHTML = ''; merge.innerHTML = '';
+    const trs = rows.map(r => H('tr', '', `<td><b>${r.src}</b></td><td></td><td></td><td></td>`, tbody));
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i], tr = trs[i];
+      trs.forEach(t => t.classList.toggle('cur', t === tr));
+      for (let c = 1; c <= 3; c++) {
+        await sleep(520); if (my !== run) return;
+        const v = [r.bloom, r.idx, r.data][c - 1];
+        tr.children[c].innerHTML = v;
+        if (r.skip && c > 1) tr.children[c].classList.add('skip');
+        if (c === 1 && r.bloom.startsWith('❌')) { tr.children[2].innerHTML = r.idx; tr.children[3].innerHTML = r.data; tr.children[2].classList.add('skip'); tr.children[3].classList.add('skip'); break; }
+      }
+    }
+    await sleep(600); if (my !== run) return;
+    trs.forEach(t => t.classList.remove('cur'));
+    merge.innerHTML = `<div><b>Scalanie po timestampach (per komórka):</b></div>
+      <div class="win">name = 'Ala' <span class="mut">← SSTable-1, ts 100 (jedyna wersja)</span></div>
+      <div class="win">email = 'nowy@x.pl' <span class="mut">← memtable, ts 300</span> &nbsp; <s>'ala@x.pl' · ts 120</s></div>
+      <div>📊 5 źródeł, z czego 2 odrzucone przez filtr Blooma bez I/O, 1 fałszywy alarm, 2 faktyczne odczyty danych.</div>`;
+  }
+  $('[data-act=play]', root).onclick = play;
+  registerFig(root, { first: play });
+})();
+
+/* ---------- 9. compaction simulator ---------- */
+(() => {
+  const root = $('#fig-compaction'), area = $('.cmp-area', root), metrics = $('.metrics', root), desc = $('.cmp-desc', root);
+  const btnPause = $('[data-act=pause]', root);
+  const DESC = {
+    stcs: '<b>STCS</b>: gdy uzbierają się 4 pliki podobnego rozmiaru, scala je w jeden większy. Mało przepisywania, ale pliki różnych „pokoleń” współistnieją — wiersz może być rozsmarowany po wielu z nich, a ostatnie scalenia potrzebują sporo wolnego miejsca.',
+    lcs: '<b>LCS</b>: L0 przyjmuje flushe; potem dane trafiają do poziomów z nienakładającymi się plikami, każdy poziom 10× większy. Odczyt dotyka co najwyżej jednego pliku na poziom — kosztem wielokrotnego przepisywania tych samych danych (zobacz write amplification).',
+    twcs: '<b>TWCS</b>: każde okno czasowe kompaktowane osobno (w środku STCS), po zamknięciu scalone w jeden plik. Stare okna nie są już ruszane, a gdy wygaśnie ich TTL, <b>cały plik znika</b> bez żadnej kompakcji.',
+  };
+  let mode = 'stcs', timer = null, paused = false, busy = false, st;
+  const blk = (size, cls = '') => `<div class="blk ${cls}" style="width:${24 + Math.sqrt(size) * 20}px">${Math.round(size * 10)}M</div>`;
+  function reset() {
+    st = { flushes: 0, ingested: 0, written: 0, tables: [], L0: 0, L1: 0, L2: 0, windows: [{ n: 0, tables: [] }], merging: null };
+    render();
+  }
+  function readCost() {
+    if (mode === 'stcs') return st.tables.length;
+    if (mode === 'lcs') return st.L0 + (st.L1 > 0) + (st.L2 > 0);
+    return st.windows[st.windows.length - 1].tables.length;
+  }
+  function render() {
+    const m = st.merging || [];
+    if (mode === 'stcs') {
+      area.innerHTML = `<div class="mut" style="margin-bottom:.4rem">SSTables (szerokość ~ rozmiar):</div><div class="blk-row">${
+        st.tables.map((s, i) => blk(s, m.includes(i) ? 'merging' : i === st.tables.length - 1 && st.fresh ? 'new' : '')).join('')}</div>`;
+    } else if (mode === 'lcs') {
+      const sq = (n, cap, cls = '', mcls = '') => Array.from({ length: cap }, (_, i) => `<span class="sq ${cls} ${i < n ? (mcls || 'f') : ''}"></span>`).join('');
+      area.innerHTML = `
+        <div class="lvl"><b>L0</b><div>${sq(st.L0, Math.max(4, st.L0), '', st.merging ? 'm' : '')} <span class="mut">flushe (mogą się nakładać)</span></div></div>
+        <div class="lvl"><b>L1</b><div>${sq(Math.ceil(st.L1), 10, '', st.merging ? 'm' : '')} <span class="mut">max 10 plików</span></div></div>
+        <div class="lvl"><b>L2</b><div>${sq(Math.ceil(st.L2), 100, 's')} <span class="mut">max 100</span></div></div>`;
+    } else {
+      area.innerHTML = `<div class="blk-row" style="align-items:stretch">${st.windows.map((w, i) => `
+        <div class="win-col ${i === st.windows.length - 1 ? 'cur' : ''} ${w.expired ? 'expired' : ''}">
+          <h5>okno ${String(8 + w.n).padStart(2, '0')}:00${w.expired ? ' · TTL ✝' : ''}</h5>
+          <div class="blk-row">${w.tables.map((s, j) => blk(s, m.includes(i + ':' + j) ? 'merging' : i === st.windows.length - 1 && j === w.tables.length - 1 && st.fresh ? 'new' : '')).join('')}</div>
+        </div>`).join('')}</div>`;
+    }
+    const tables = mode === 'stcs' ? st.tables.length : mode === 'lcs' ? st.L0 + Math.ceil(st.L1) + Math.ceil(st.L2) : st.windows.reduce((a, w) => a + w.tables.length, 0);
+    metrics.innerHTML = `
+      <div class="metric"><b>${st.flushes}</b>flushy</div>
+      <div class="metric"><b>${tables}</b>SSTables razem</div>
+      <div class="metric"><b>${readCost()}</b>${mode === 'twcs' ? 'plików dla zapytania o ostatnią godzinę' : 'plików do sprawdzenia przy odczycie (najgorzej)'}</div>
+      <div class="metric"><b>${st.ingested ? (st.written / st.ingested).toFixed(2) : '0'}×</b>write amplification</div>`;
+    desc.innerHTML = DESC[mode];
+    st.fresh = false;
+  }
+  async function stcsStep() {
+    st.tables.push(1);
+    render();
+    // bucket by similar size (0.5×–1.5× of bucket average), compact 4 at once (min_threshold)
+    const order = st.tables.map((s, i) => [s, i]).sort((a, b) => a[0] - b[0]);
+    const buckets = [];
+    for (const [s, i] of order) {
+      const b = buckets.find(b => s >= b.avg * .5 && s <= b.avg * 1.5);
+      if (b) { b.items.push(i); b.avg = b.items.reduce((a, j) => a + st.tables[j], 0) / b.items.length; }
+      else buckets.push({ avg: s, items: [i] });
+    }
+    const full = buckets.find(b => b.items.length >= 4);
+    if (!full) return;
+    const pickI = full.items.slice(0, 4);
+    st.merging = pickI; render(); await sleep(700);
+    const sum = pickI.reduce((a, i) => a + st.tables[i], 0);
+    st.tables = st.tables.filter((_, i) => !pickI.includes(i));
+    const out = sum * .9; // overwritten / duplicate cells dropped
+    st.tables.push(out); st.written += out; st.merging = null;
+  }
+  async function lcsStep() {
+    st.L0++;
+    render();
+    if (st.L0 < 4) return;
+    st.merging = true; render(); await sleep(700);
+    const data = st.L0 * .9;
+    st.written += data + st.L1;           // L0 overlaps all of L1 → rewrite L1 too
+    st.L1 += data; st.L0 = 0;
+    while (st.L1 > 10) {                   // promote one file, merging with ~10 overlapping L2 files
+      st.L1 -= 1;
+      st.written += 1 + Math.min(10, Math.ceil(st.L2));
+      st.L2 += 1;
+    }
+    st.L2 = Math.min(st.L2, 100);
+    st.merging = null;
+  }
+  async function twcsStep() {
+    let cur = st.windows[st.windows.length - 1];
+    cur.tables.push(1);
+    render();
+    if (cur.tables.length >= 4) {
+      st.merging = cur.tables.map((_, j) => (st.windows.length - 1) + ':' + j); render(); await sleep(600);
+      const s = cur.tables.reduce((a, b) => a + b, 0); cur.tables = [s]; st.written += s; st.merging = null;
+    }
+    if (st.flushes % 6 === 0) {         // window closes: major-compact it into one file
+      if (cur.tables.length > 1) {
+        st.merging = cur.tables.map((_, j) => (st.windows.length - 1) + ':' + j); render(); await sleep(600);
+        const s = cur.tables.reduce((a, b) => a + b, 0); cur.tables = [s]; st.written += s; st.merging = null;
+      }
+      st.windows.push({ n: cur.n + 1, tables: [] });
+      if (st.windows.length > 5) {         // oldest window past TTL: drop the whole file
+        st.windows[0].expired = true; render(); await sleep(900);
+        st.windows.shift();
+      }
+    }
+  }
+  async function tick() {
+    if (busy || paused) return;
+    busy = true;
+    st.flushes++; st.ingested++; st.written++; st.fresh = true;
+    try { await ({ stcs: stcsStep, lcs: lcsStep, twcs: twcsStep })[mode](); } finally { busy = false; render(); }
+  }
+  $$('[data-mode]', root).forEach(b => b.onclick = () => {
+    mode = b.dataset.mode;
+    $$('[data-mode]', root).forEach(x => x.classList.toggle('on', x === b));
+    reset();
+  });
+  btnPause.onclick = () => { paused = !paused; btnPause.textContent = paused ? '▶ Wznów' : '⏸ Pauza'; };
+  $('[data-act=reset]', root).onclick = reset;
+  reset();
+  registerFig(root, {
+    enter() { clearInterval(timer); timer = setInterval(tick, REDUCE ? 1500 : 850); },
+    leave() { clearInterval(timer); }
+  });
+})();
+
+/* ---------- 10. tombstones & zombies ---------- */
+(() => {
+  const root = $('#fig-tomb'), repsEl = $('.reps', root), st = $('.tstatus', root), mk = $('.tl .mk', root), tl = $('.tl', root);
+  const DAYS = 13;
+  $('.tl .gc', root).style.left = (10 / DAYS * 100) + '%';
+  for (let d = 0; d <= 12; d += 2) H('span', 'd', `dzień ${d}`, tl).style.left = (d / DAYS * 100) + '%';
+  const D = 'data', X = 'tomb';
+  const base = [
+    { day: 0, A: [D], B: [D], C: [D], down: false, msg: 'Trzy repliki (RF=3) przechowują <code>email = \'ala@x.pl\'</code> z timestampem 100.' },
+    { day: 0.3, A: [D], B: [D], C: [D], down: true, msg: 'Węzeł C pada (awaria dysku, długi restart, cokolwiek).' },
+    { day: 0.6, A: [D, X], B: [D, X], C: [D], down: true, msg: '<code>DELETE … CONSISTENCY QUORUM</code> → A i B zapisują <b>tombstone</b> (ts 200), który przesłania dane. Sukces: 2 z 3. Koordynator zapisuje hint dla C, ale C leży dłużej niż <code>max_hint_window</code> (3 h) — hint przepada.' },
+    { day: 2, A: [D, X], B: [D, X], C: [D], down: false, msg: 'C wraca po 2 dniach. Wciąż ma starą wartość — nikt mu nie powiedział o usunięciu. Odczyty QUORUM są jeszcze poprawne: tombstone z A lub B wygrywa.' },
+  ];
+  const yes = [
+    { day: 5, A: [D, X], B: [D, X], C: [D, X], down: false, msg: '🔧 <code>nodetool repair</code> (w ciągu gc_grace!) porównuje drzewa Merkle i streamuje tombstone do C. Teraz wszystkie repliki wiedzą o usunięciu.' },
+    { day: 11, A: [], B: [], C: [], down: false, msg: '⏳ Minęło <code>gc_grace_seconds</code> (10 dni). Kompakcja na każdej replice wyrzuca tombstone razem z przesłoniętymi danymi. Czysto.' },
+    { day: 12, A: [], B: [], C: [], down: false, msg: '✅ <code>SELECT … QUORUM</code> → brak wiersza. Usunięte pozostało usunięte.', ok: true },
+  ];
+  const no = [
+    { day: 5, A: [D, X], B: [D, X], C: [D], down: false, msg: '😴 Nikt nie uruchamia repair… „przecież działa”.' },
+    { day: 11, A: [], B: [], C: [D], down: false, msg: '⏳ Minęło <code>gc_grace_seconds</code>. Kompakcja na A i B wyrzuca tombstone i dane. Na C tombstone nigdy nie dotarł, więc dane tam zostają.' },
+    { day: 12, A: ['Z'], B: ['Z'], C: [D], down: false, msg: '🧟 <code>SELECT … QUORUM</code> trafia w B i C. C ma dane z ts 100, B nie ma nic — nie ma już nagrobka, który by je przesłonił. Read repair „naprawia” B (i A). <b>Usunięty wiersz powstał z martwych!</b>', bad: true },
+  ];
+  let step = 0, auto = null;
+  const steps = () => base.concat($('input[name=tomb-repair]:checked', root).value === 'yes' ? yes : no);
+  function cell(kind, hasTomb) {
+    if (kind === X) return `<div class="cell tomb">🪦 tombstone · ts 200</div>`;
+    if (kind === 'Z') return `<div class="cell zombie">🧟 email = 'ala@x.pl' · ts 100</div>`;
+    return `<div class="cell data ${hasTomb ? 'shadow' : ''}">email = 'ala@x.pl' · ts 100</div>`;
+  }
+  function render() {
+    const all = steps(), s = all[step];
+    mk.style.left = (s.day / DAYS * 100) + '%';
+    repsEl.innerHTML = ['A', 'B', 'C'].map(n => {
+      const cs = s[n], down = n === 'C' && s.down, t = cs.includes(X);
+      return `<div class="rep ${down ? 'down' : ''}"><h5>Replika ${n} ${down ? '💤 DOWN' : ''}</h5>${cs.map(c => cell(c, t)).join('') || '<div class="mut">(pusto)</div>'}</div>`;
+    }).join('');
+    st.className = 'status tstatus' + (s.bad ? ' bad' : s.ok ? ' ok' : '');
+    st.innerHTML = `<b>Krok ${step + 1}/${all.length}.</b> ${s.msg}`;
+  }
+  const go = d => { step = Math.max(0, Math.min(steps().length - 1, step + d)); render(); };
+  function stopAuto() { clearInterval(auto); auto = null; }
+  function startAuto() {
+    stopAuto();
+    if (step >= steps().length - 1) step = 0;
+    render();
+    auto = setInterval(() => { if (step >= steps().length - 1) return stopAuto(); go(1); }, REDUCE ? 3000 : 2600);
+  }
+  $('[data-act=next]', root).onclick = () => { stopAuto(); go(1); };
+  $('[data-act=prev]', root).onclick = () => { stopAuto(); go(-1); };
+  $('[data-act=restart]', root).onclick = () => { stopAuto(); step = 0; render(); };
+  $('[data-act=auto]', root).onclick = () => (auto ? stopAuto() : startAuto());
+  $$('input[name=tomb-repair]', root).forEach(r => r.onchange = render);
+  render();
+  registerFig(root, { first: startAuto, leave: stopAuto });
+})();
+
+/* ---------- 11. Merkle trees ---------- */
+(() => {
+  const root = $('#fig-merkle'), s = $('svg', root), st = $('.mstatus', root);
+  const LEAVES = 8, TW = 370, OFF = [0, 410];
+  let dataA, dataB, trees, busy = false;
+  const status = (h, c = '') => { st.className = 'status mstatus ' + c; st.innerHTML = h; };
+  function newDiff() {
+    dataA = Array.from({ length: LEAVES }, (_, i) => `r${i}:v1`);
+    dataB = [...dataA];
+    shuffle([...Array(LEAVES).keys()]).slice(0, 1 + (Math.random() < .5)).forEach(i => dataB[i] = `r${i}:v2`);
+    build(); draw();
+    status('Identyczne hashe korzeni = identyczne dane w całym zakresie. Różne = schodzimy niżej.');
+  }
+  function levels(data) {
+    const lv = [data.map(d => hex(d, 4))];
+    while (lv[0].length > 1) {
+      const up = [];
+      for (let i = 0; i < lv[0].length; i += 2) up.push(hex(lv[0][i] + lv[0][i + 1], lv[0].length > 4 ? 4 : 6));
+      lv.unshift(up);
+    }
+    return lv; // lv[0] = root
+  }
+  function build() { trees = [levels(dataA), levels(dataB)]; }
+  let boxes;
+  function draw() {
+    s.innerHTML = '';
+    boxes = [[], []];
+    trees.forEach((lv, t) => {
+      const ox = OFF[t];
+      T(s, ox + TW / 2, 16, t === 0 ? 'Replika A' : 'Replika B', { 'font-weight': 800 });
+      lv.forEach((row, l) => {
+        boxes[t][l] = [];
+        const y = 40 + l * 62, w = Math.min(84, TW / row.length - 6);
+        row.forEach((h, j) => {
+          const x = ox + (j + .5) * TW / row.length;
+          if (l > 0) {
+            const px = ox + (Math.floor(j / 2) + .5) * TW / lv[l - 1].length;
+            S('line', { x1: px, y1: y - 62 + 26, x2: x, y2: y, class: 'edge' }, s);
+          }
+          const g = S('g', {}, s);
+          const r = S('rect', { x: x - w / 2, y, width: w, height: 26, rx: 5 }, g);
+          r.style.fill = C.paper; r.style.stroke = C.ink; r.style.strokeWidth = 2;
+          T(g, x, y + 17, h, { 'font-size': l === 3 ? 10 : 12, 'font-family': 'ui-monospace,monospace', 'font-weight': 700 });
+          if (l === 3) T(g, x, y + 42, `r${j}`, { class: 'tiny' }).style.fill = C.mut;
+          boxes[t][l][j] = r;
+        });
+      });
+    });
+  }
+  const color = (l, j, c) => boxes.forEach(b => { b[l][j].style.fill = c; });
+  async function compare() {
+    if (busy) return; busy = true;
+    draw();
+    let queue = [[0, 0]], cmp = 0; const diff = [];
+    while (queue.length) {
+      const next = [];
+      for (const [l, j] of queue) {
+        cmp++;
+        const eq = trees[0][l][j] === trees[1][l][j];
+        color(l, j, eq ? 'color-mix(in srgb, var(--ok) 35%, var(--paper2))' : 'color-mix(in srgb, var(--bad) 35%, var(--paper2))');
+        if (!eq) { if (l === 3) diff.push(j); else next.push([l + 1, 2 * j], [l + 1, 2 * j + 1]); }
+      }
+      await sleep(650);
+      queue = next;
+    }
+    status(diff.length
+      ? `Porównano ${cmp} hashy. Różnią się tylko zakresy <b>${diff.map(j => 'r' + j).join(', ')}</b> — tylko je trzeba przesłać (${diff.length}/${LEAVES} danych). Zielone poddrzewa pominięto w całości.`
+      : `Korzenie równe po ${cmp} porównaniu — repliki są zgodne, nic nie przesyłamy.`, diff.length ? 'warn' : 'ok');
+    busy = false;
+  }
+  async function fix() {
+    if (busy) return;
+    const d = dataB.map((v, i) => v !== dataA[i] ? i : -1).filter(i => i >= 0);
+    if (!d.length) return status('Nic do naprawy — repliki są zgodne.', 'ok');
+    busy = true;
+    for (const i of d) {
+      const a = boxes[0][3][i], b = boxes[1][3][i];
+      const ax = +a.getAttribute('x') + +a.getAttribute('width') / 2, bx = +b.getAttribute('x') + +b.getAttribute('width') / 2, y = +a.getAttribute('y') + 13;
+      await flyDot(s, ax, y, bx, y, { color: C.accent2, r: 7, ms: 800 });
+      dataB[i] = dataA[i] = `r${i}:v2`; // newest version wins on both sides
+    }
+    build(); draw(); busy = false;
+    status(`Przesłano zakresy ${d.map(i => 'r' + i).join(', ')} (w obie strony obowiązuje najnowszy timestamp). Kliknij „Porównaj” — korzenie są już równe.`, 'ok');
+  }
+  $('[data-act=compare]', root).onclick = compare;
+  $('[data-act=fix]', root).onclick = fix;
+  $('[data-act=new]', root).onclick = () => { if (!busy) newDiff(); };
+  newDiff();
+  registerFig(root, { first() { setTimeout(compare, 500); } });
+})();
+
+/* ---------- 12. CAP / partition ---------- */
+(() => {
+  const root = $('#fig-cap'), s = $('svg', root), st = $('.capstatus', root);
+  const N = { A: { x: 150, y: 90 }, B: { x: 150, y: 190 }, C: { x: 450, y: 140 } };
+  const K1 = { x: 40, y: 140 }, K2 = { x: 560, y: 140 };
+  const gE = S('g', {}, s), gN = S('g', {}, s), fx = S('g', {}, s);
+  S('line', { x1: N.A.x, y1: N.A.y, x2: N.B.x, y2: N.B.y, class: 'edge' }, gE);
+  const cut = [S('line', { x1: N.A.x, y1: N.A.y, x2: N.C.x, y2: N.C.y, class: 'edge' }, gE), S('line', { x1: N.B.x, y1: N.B.y, x2: N.C.x, y2: N.C.y, class: 'edge' }, gE)];
+  const wall = S('path', { d: 'M300 10 L285 60 L312 105 L287 150 L313 195 L295 245', fill: 'none', 'stroke-width': 5, 'stroke-linecap': 'round' }, gE);
+  wall.style.stroke = C.bad; wall.style.opacity = 0; wall.style.transition = 'opacity .4s';
+  const vals = {};
+  for (const [n, p] of Object.entries(N)) {
+    const g = S('g', { class: 'nd' }, gN); S('circle', { cx: p.x, cy: p.y, r: 24 }, g); T(g, p.x, p.y + 5, n);
+    p.g = g; vals[n] = T(gN, p.x, p.y + 44, 'x = 0', { class: 'small', 'font-weight': 700 });
+  }
+  [[K1, 'K1'], [K2, 'K2']].forEach(([p, l]) => {
+    const r = S('rect', { x: p.x - 26, y: p.y - 16, width: 52, height: 32, rx: 6 }, gN);
+    r.style.fill = C.card; r.style.stroke = C.ink; r.style.strokeWidth = 2;
+    T(gN, p.x, p.y + 5, l, { 'font-weight': 800 });
+  });
+  const res1 = T(gN, K1.x + 10, 232, '', { 'font-weight': 800 }), res2 = T(gN, K2.x - 10, 232, '', { 'font-weight': 800 });
+  let busy = false;
+  async function go() {
+    if (busy) return; busy = true;
+    const cl = $('[data-k=cl]', root).value, need = { ONE: 1, QUORUM: 2, ALL: 3 }[cl];
+    Object.values(vals).forEach(v => v.textContent = 'x = 0');
+    res1.textContent = res2.textContent = '';
+    wall.style.opacity = 1; cut.forEach(l => l.style.opacity = .15);
+    await sleep(500);
+    const left = 2 >= need, right = 1 >= need;
+    await Promise.all([
+      flyDot(fx, K1.x, K1.y, N.A.x, N.A.y, { ms: 500 }).then(async () => {
+        if (!left) return;
+        await flyDot(fx, N.A.x, N.A.y, N.B.x, N.B.y, { ms: 400 });
+        vals.A.textContent = vals.B.textContent = 'x = 1 (ts 10:00:01)';
+      }),
+      flyDot(fx, K2.x, K2.y, N.C.x, N.C.y, { ms: 500, color: C.accent2 }).then(() => { if (right) vals.C.textContent = 'x = 2 (ts 10:00:02)'; }),
+    ]);
+    res1.textContent = left ? '✅ OK' : '❌ Unavailable'; res1.style.fill = left ? C.ok : C.bad;
+    res2.textContent = right ? '✅ OK' : '❌ Unavailable'; res2.style.fill = right ? C.ok : C.bad;
+    const txt = {
+      ONE: '<b>CL=ONE → AP.</b> Obie strony przyjęły zapisy — system jest dostępny, ale repliki się rozjechały. Po naprawie sieci (hinty, read repair, repair) wygra <b>last-write-wins</b>: x = 2, bo ma późniejszy timestamp. Zapis K1 zniknie po cichu.',
+      QUORUM: '<b>CL=QUORUM → zachowanie CP dla tego zapytania.</b> Strona z większością (A, B) działa, mniejszość (C) odmawia. Każdy potwierdzony zapis jest na większości, więc odczyt QUORUM po naprawie sieci zawsze go zobaczy.',
+      ALL: '<b>CL=ALL.</b> Nikt nie zbierze 3 potwierdzeń — obie strony odmawiają. Maksymalna spójność, zerowa odporność na awarie. W praktyce prawie nigdy nie używane.',
+    }[cl];
+    st.className = 'status capstatus ' + (cl === 'ONE' ? 'warn' : cl === 'QUORUM' ? 'ok' : 'bad');
+    st.innerHTML = txt;
+    await sleep(2500);
+    wall.style.opacity = .35; cut.forEach(l => l.style.opacity = 1);
+    busy = false;
+  }
+  $('[data-act=go]', root).onclick = go;
+  registerFig(root, { first() { setTimeout(go, 500); } });
+})();
+
+/* ---------- 13. data modeling ---------- */
+(() => {
+  const root = $('#fig-model'), parts = $('.partitions', root), loads = $('.loadbars', root), st = $('.mdstatus', root), chk = $('[data-k=bucket]', root);
+  const CH = ['#ogólny', '#random', '#projekt-x'];
+  const NODES = ['A', 'B', 'C', 'D', 'E', 'F'];
+  const ring = [.04, .2, .36, .52, .7, .86];
+  const nodeOf = f => { const i = ring.findIndex(t => t >= f); return i < 0 ? 0 : i; };
+  let msgs = [], lastKey = null, flooding = false;
+  const HOT = 40;
+  function partitions() {
+    const map = new Map(), perCh = {};
+    for (const m of msgs) {
+      perCh[m.ch] = (perCh[m.ch] || 0) + 1;
+      const week = 39 + Math.floor((perCh[m.ch] - 1) / 15);
+      const key = chk.checked ? `${m.ch}|2026-W${week}` : m.ch;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(m);
+    }
+    return [...map.entries()].map(([k, rows]) => ({ k, rows, f: frac(k), node: nodeOf(frac(k)) })).sort((a, b) => a.k.localeCompare(b.k));
+  }
+  function render(newKey) {
+    const ps = partitions();
+    parts.innerHTML = ps.map(p => {
+      const [ch, wk] = p.k.split('|');
+      const hot = p.rows.length > HOT;
+      const shown = Math.min(p.rows.length, 16);
+      return `<div class="prow ${hot ? 'hot' : ''}">
+        <div class="pk">(${ch}${wk ? ', ' + wk : ''})<small>token ${fmtToken(p.f)} → węzeł ${NODES[p.node]}</small></div>
+        <div class="cells">${Array.from({ length: shown }, (_, i) => `<span class="c" ${i === 0 && p.k === newKey ? '' : 'style="animation:none"'} title="${p.rows[p.rows.length - 1 - i].ch} #${p.rows.length - i}"></span>`).join('')}
+          ${p.rows.length > shown ? `<span class="more">+${p.rows.length - shown} …</span>` : ''}</div>
+        <div><b>${p.rows.length}</b> ${hot ? '🔥' : ''}</div></div>`;
+    }).join('') || '<div class="mut" style="font:13px var(--sans)">Brak wiadomości.</div>';
+    const load = NODES.map((_, i) => ps.filter(p => p.node === i).reduce((a, p) => a + p.rows.length, 0));
+    const max = Math.max(1, ...load);
+    loads.innerHTML = load.map((v, i) => `<div style="height:${(v / max * 100).toFixed(0)}%" title="${v} wierszy"><span>${NODES[i]}</span></div>`).join('');
+    const hot = ps.filter(p => p.rows.length > HOT);
+    if (hot.length) {
+      st.className = 'status mdstatus bad';
+      st.innerHTML = `🔥 Partycja <code>${hot[0].k.replace('|', ', ')}</code> ma ${hot[0].rows.length} wierszy i rośnie bez końca. Cały ruch kanału idzie w te same repliki (węzeł ${NODES[hot[0].node]}), a partycja kiedyś przekroczy sensowny rozmiar. Włącz <b>bucketing</b>.`;
+    } else if (chk.checked && msgs.length) {
+      st.className = 'status mdstatus ok';
+      st.innerHTML = `Bucketing: klucz partycji <code>(channel_id, bucket)</code>. Każdy tydzień kanału to osobna, ograniczona partycja o innym tokenie — obciążenie rozkłada się po węzłach. Cena: zapytanie o „ostatnie 50 wiadomości” czasem musi przeczytać 2 buckety.`;
+    } else {
+      st.className = 'status mdstatus';
+      st.innerHTML = `Jedna partycja na kanał. Odczyt „ostatnie N wiadomości z kanału” to jeden sekwencyjny plasterek posortowanej partycji — idealne zapytanie dla Cassandry.`;
+    }
+  }
+  function send(ch) {
+    ch = ch || pick(CH);
+    msgs.push({ ch });
+    const ps = partitions();
+    const mine = ps.filter(p => p.k.startsWith(ch));
+    lastKey = mine[mine.length - 1].k;
+    render(lastKey);
+  }
+  $('[data-act=send]', root).onclick = () => send();
+  $('[data-act=flood]', root).onclick = async () => {
+    if (flooding) return; flooding = true;
+    for (let i = 0; i < 60; i++) { send('#ogólny'); await sleep(35); }
+    flooding = false;
+  };
+  $('[data-act=reset]', root).onclick = () => { msgs = []; render(); };
+  chk.onchange = () => render();
+  render();
+  registerFig(root, { async first() { for (let i = 0; i < 9; i++) { send(CH[i % 3]); await sleep(250); } } });
+
+  // partition size calculator
+  const calc = $('.calc'), out = $('.calc-out');
+  function calcUpdate() {
+    const v = k => Math.max(0, +$(`[data-k=${k}]`, calc).value || 0);
+    const nr = v('nr'), nc = v('nc'), npk = v('npk'), ns = v('ns'), bytes = v('bytes');
+    const nv = nr * Math.max(0, nc - npk - ns) + ns;
+    const mb = nr * bytes / 1048576;
+    const bad = nv > 100000 || mb > 100 || nr > 100000;
+    out.className = 'status calc-out ' + (bad ? 'bad' : 'ok');
+    out.innerHTML = `N<sub>v</sub> = ${nr.toLocaleString('pl')} × (${nc} − ${npk} − ${ns}) + ${ns} = <b>${nv.toLocaleString('pl')}</b> wartości, ~<b>${mb.toFixed(1)} MB</b> na partycję. ` +
+      (bad ? '⚠️ Za duża partycja — dodaj bucket do klucza partycji (np. dzień/tydzień albo hash % N).' : '✅ Rozsądny rozmiar.');
+  }
+  $$('input', calc).forEach(i => i.oninput = calcUpdate);
+  calcUpdate();
+})();
+
+/* ---------- 14. quiz ---------- */
+(() => {
+  const Q = [
+    ['Klient zapisuje z CL=QUORUM przy RF=3 i wszystkie repliki żyją. Ile replik dostanie zapis?',
+      ['2 — tyle wynosi kworum', '3 — wszystkie; QUORUM określa tylko, na ile potwierdzeń czeka koordynator', '1 — koordynator, reszta przez gossip'], 1,
+      'Koordynator zawsze wysyła mutację do wszystkich replik. CL decyduje wyłącznie o tym, kiedy odpowie klientowi.'],
+    ['Co jest pierwszym krokiem zapisu na replice, dającym trwałość na wypadek awarii?',
+      ['Zapis do SSTable', 'Dopisanie do commit logu', 'Wstawienie do memtable', 'Aktualizacja filtra Blooma'], 1,
+      'Commit log (append-only) daje trwałość; memtable daje posortowany widok w RAM. SSTable powstaje dopiero przy flushu.'],
+    ['RF=3, zapis ONE, odczyt ONE. Czy odczyt zawsze zobaczy ostatni potwierdzony zapis?',
+      ['Tak, bo zapis trafia do wszystkich replik', 'Nie, bo R + W = 2 ≤ 3', 'Tak, dzięki read repair'], 1,
+      'Zbiory mogą się nie przeciąć: zapis potwierdziła R1, a czytamy R3, do której zapis jeszcze nie dotarł.'],
+    ['Do czego służy filtr Blooma w SSTable?',
+      ['Szyfruje klucze partycji', 'Pozwala pominąć SSTables, w których klucza na pewno nie ma', 'Sortuje dane przy flushu', 'Wykrywa awarie węzłów'], 1,
+      'Filtr Blooma może się mylić tylko w stronę „może jest”; „nie ma” jest pewne, więc oszczędza I/O.'],
+    ['Repair nie działał dłużej niż gc_grace_seconds, a jedna replika przegapiła DELETE. Co grozi?',
+      ['Nic — tombstone żyje wiecznie', 'Zombie: usunięte dane wrócą przez read repair / repair', 'Utrata wszystkich danych tabeli'], 1,
+      'Pozostałe repliki wyrzuciły tombstone przy kompakcji, a stara wartość z zaległej repliki „naprawi” resztę.'],
+    ['Metryki IoT z TTL 30 dni, zapisy tylko „do przodu” w czasie. Jaka strategia kompakcji?',
+      ['STCS', 'LCS', 'TWCS'], 2,
+      'TWCS grupuje dane w okna czasowe, a wygasłe okna usuwa w całości — bez kosztownej kompakcji tombstonów.'],
+    ['Jaka jest rola seed nodes?',
+      ['Są masterami zatwierdzającymi zmiany topologii', 'Są punktem kontaktowym gossipu dla startujących węzłów', 'Przechowują wszystkie hinty'], 1,
+      'Seed to „recepcja” — nie ma żadnej władzy. Klaster działa dalej, gdy seed padnie.'],
+    ['Jak projektujesz tabele w Cassandrze?',
+      ['Normalizuję do 3NF, potem dodaję indeksy', 'Zaczynam od zapytań: tabela na zapytanie, denormalizacja', 'Jedna tabela z ALLOW FILTERING na wszystko'], 1,
+      'Query-first: każde zapytanie aplikacji powinno czytać jedną partycję jednej tabeli.'],
+    ['Po co vnodes?',
+      ['Żeby można było mieć więcej niż 3 repliki', 'Równiejszy rozkład danych i odbudowa/przejęcie obciążenia rozłożone na wiele węzłów', 'Żeby każdy węzeł miał kopię wszystkich danych'], 1,
+      'Wiele małych zakresów na węzeł wygładza rozkład i rozprasza streaming przy dodawaniu/usuwaniu węzłów.'],
+    ['Co decyduje, na którym węźle ląduje wiersz?',
+      ['Kolumny klastrujące', 'Token = hash klucza partycji (Murmur3) i położenie na pierścieniu', 'Kolejność wstawiania', 'Węzeł, z którym połączył się klient'], 1,
+      'Klucz partycji → token → pierwszy węzeł zgodnie z ruchem wskazówek zegara (+ kolejne repliki wg strategii).'],
+  ];
+  const box = $('#quiz'), score = $('#score');
+  let good = 0, answered = 0;
+  const upd = () => { score.textContent = `Wynik: ${good} / ${answered}${answered === Q.length ? (good === Q.length ? ' 🏆' : good >= 7 ? ' 👍' : ' 📚') : ''}`; };
+  Q.forEach(([q, opts, ok, why], n) => {
+    const d = H('div', 'quiz-q reveal', `<h4>${n + 1}. ${q}</h4><div class="opts"></div><div class="why">💡 ${why}</div>`, box);
+    const o = $('.opts', d);
+    opts.forEach((t, i) => {
+      const b = H('button', '', t, o);
+      b.onclick = () => {
+        if (d.classList.contains('done')) return;
+        d.classList.add('done'); answered++;
+        if (i === ok) good++; else b.classList.add('wrong');
+        o.children[ok].classList.add('right');
+        $$('button', o).forEach(x => x.disabled = true);
+        upd();
+      };
+    });
+    revealIO.observe(d);
+  });
+  upd();
+})();
+
+</script>
+</body>
+</html>

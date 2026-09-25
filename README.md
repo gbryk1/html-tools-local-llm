@@ -1,6 +1,6 @@
 # HTML tools z lokalnym modelem w przeglądarce
 
-Dwa samodzielne narzędzia HTML w duchu
+Samodzielne narzędzia HTML w duchu
 [„Useful patterns for building HTML tools”](https://simonwillison.net/2025/Dec/10/html-tools/)
 Simona Willisona: pojedyncze pliki HTML, bez Reacta, bez build-stepu, bez backendu.
 Modele neuronowe są wbudowane w strony jako **base64** i uruchamiane w przeglądarce przez
@@ -13,6 +13,7 @@ Dane użytkownika nigdy nie opuszczają urządzenia.
 |---|---|---|---|
 | [`docs/speech-to-text.html`](docs/speech-to-text.html) | `onnx-community/whisper-tiny` (q8, wielojęzyczny) | 58 MB | Cały model w jednym pliku HTML |
 | [`docs/chat.html`](docs/chat.html) | `onnx-community/SmolLM2-135M-Instruct-ONNX` (q4f16) | 117 MB → 156 MB base64 | Model podzielony na 3 pliki `.txt` (limit 100 MB/plik na GitHub Pages) |
+| [`docs/cassandra-course.html`](docs/cassandra-course.html) | — (brak modelu ML) | ~160 KB | Animowany kurs wewnętrznej architektury i zasad designu Apache Cassandra w stylu „Head First” (scrollytelling, SVG/Canvas, IntersectionObserver). Źródło: `src/cassandra-course.html`, kopiowane przez `build.py` |
 
 ### Jak to działa
 
