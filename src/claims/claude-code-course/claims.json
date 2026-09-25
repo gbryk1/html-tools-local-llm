@@ -1,0 +1,3194 @@
+[
+ {
+  "where": "intro",
+  "level": "1",
+  "kind": "p",
+  "text": "This is not a list of Claude Code features. The docs already have that, and it changes every week. This guide is about mechanisms: why Claude reads five files before it edits one, why a long session gets worse, why a rule in CLAUDE.md is a request and a hook is a guarantee. When you understand the mechanism, every new feature is just a new knob on a machine you already know.",
+  "id": "C0001"
+ },
+ {
+  "where": "intro",
+  "level": "1",
+  "kind": "p",
+  "text": "The path goes from zero to expert in four stages. Chapters 1–3 build the mental model (loop, terminal, context). Chapters 4–8 are the daily-driver skills (memory, permissions, planning, prompting, rewinding). Chapters 9–12 are the extension layer (skills, subagents, hooks, MCP, plugins). Chapters 13–16 are the expert layer (parallel sessions, CI, model choice, habits). Each chapter has one interactive figure: click the buttons, break things, press ↺ Reset.",
+  "id": "C0002"
+ },
+ {
+  "where": "intro",
+  "level": "1",
+  "kind": "p",
+  "text": "Before you start: if you had to design an AI that edits a real repository, what would you worry about most? Wrong edits? Deleted files? Forgetting what it was doing? Running up a bill? Keep your list. By chapter 16 every item on it will have a named feature that exists precisely for it.",
+  "id": "C0003"
+ },
+ {
+  "where": "intro",
+  "level": "1",
+  "kind": "p",
+  "text": "You do not need to memorize commands. Type / in Claude Code and the full menu appears; press ? on an empty prompt for shortcuts. Memorize the ideas — the menu will remind you of the names. Facts here were checked against the official docs at code.claude.com/docs in September 2026; Claude Code ships often, so run /release-notes when something looks different.",
+  "id": "C0004"
+ },
+ {
+  "where": "loop",
+  "level": "1",
+  "kind": "p",
+  "text": "A chat model answers. An agent acts. Claude Code wraps a Claude model in a loop with tools: the model reads your request, decides which tool to call (read a file, grep, edit, run a shell command, fetch a URL), sees the result, and decides again. It repeats until it thinks the job is done — or until you interrupt.",
+  "id": "C0005"
+ },
+ {
+  "where": "loop",
+  "level": "1",
+  "kind": "p",
+  "text": "The docs describe three phases that blend into each other: gather context, take action, verify results. The single most important sentence in this whole guide follows from that loop: Claude is only as good as its ability to check its own work. If there is a test, a build, a linter, or a screenshot it can look at, the loop closes itself. If not, you are the verification step.",
+  "id": "C0006"
+ },
+ {
+  "where": "loop",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Simplified: a real run may batch several read-only tool calls in parallel and stream its reasoning. The tool names are the real ones (Grep, Read, Edit, Bash).",
+  "id": "C0007"
+ },
+ {
+  "where": "loop",
+  "level": "1",
+  "kind": "div",
+  "text": "Why did it read files before editing? I told it which test fails.",
+  "id": "C0008"
+ },
+ {
+  "where": "loop",
+  "level": "1",
+  "kind": "div",
+  "text": "Because the model starts every session knowing nothing about your code. It has no index of your repo in its head. Everything it knows comes from what it read in this session, plus CLAUDE.md and auto memory (chapter 4). Reading first is the correct behavior — you can make it faster by pointing at files with @path.",
+  "id": "C0009"
+ },
+ {
+  "where": "loop",
+  "level": "1",
+  "kind": "div",
+  "text": "Can I type while it works?",
+  "id": "C0010"
+ },
+ {
+  "where": "loop",
+  "level": "1",
+  "kind": "div",
+  "text": "Yes. Messages you type during a turn are queued and read by Claude at the next step. Press Esc to stop the current step immediately; the work done so far stays, and you can redirect.",
+  "id": "C0011"
+ },
+ {
+  "where": "loop",
+  "level": "1",
+  "kind": "li",
+  "text": "Claude Code = model + tools + a loop: gather context → act → verify → repeat.",
+  "id": "C0012"
+ },
+ {
+  "where": "loop",
+  "level": "1",
+  "kind": "li",
+  "text": "Apart from CLAUDE.md and auto memory, it knows nothing about your repo at start; reading is not wasted time.",
+  "id": "C0013"
+ },
+ {
+  "where": "loop",
+  "level": "1",
+  "kind": "li",
+  "text": "Give it a way to verify (tests, build, screenshots). No verification ⇒ plausible-looking bugs.",
+  "id": "C0014"
+ },
+ {
+  "where": "loop",
+  "level": "1",
+  "kind": "li",
+  "text": "Esc interrupts, typing mid-turn queues a correction. Steer early.",
+  "id": "C0015"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "p",
+  "text": "Install with the native installer and start it inside a project directory:",
+  "id": "C0016"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "pre",
+  "text": "# macOS, Linux, WSL curl -fsSL https://claude.ai/install.sh | bash # Windows PowerShell irm https://claude.ai/install.ps1 | iex cd my-project claude # interactive session claude \"explain the auth flow\" # start with a prompt claude -c # continue the latest conversation in this directory claude -r # pick an older session to resume",
+  "id": "C0017"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "p",
+  "text": "The same engine runs in several surfaces: the terminal CLI, VS Code and JetBrains extensions, the Desktop app, the web at claude.ai/code (cloud sessions in a sandbox), the mobile app, and Slack. They share your repo's CLAUDE.md files, settings and MCP servers. With a claude.ai subscription you can move a session between them: /desktop hands a terminal session to the Desktop app, --teleport pulls a cloud session into your terminal, and /remote-control lets you steer a local session from your phone.",
+  "id": "C0018"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "p",
+  "text": "Inside the prompt, a few characters change what you type into something else. Learn these and you already use Claude Code better than most people:",
+  "id": "C0019"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Output is abbreviated. In a real session / shows every built-in command, bundled skill and your own skills, filtered as you type.",
+  "id": "C0020"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "tr",
+  "text": "Esc | Interrupt the current step | Claude heads the wrong way. Do it early.",
+  "id": "C0021"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "tr",
+  "text": "Esc Esc | Clear the draft, or on empty input open the rewind menu | Undo the last few prompts (chapter 8)",
+  "id": "C0022"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "tr",
+  "text": "Shift+Tab | Cycle permission modes | Switch to plan mode or accept-edits (chapter 5)",
+  "id": "C0023"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "tr",
+  "text": "Ctrl+G | Open the prompt (or plan) in your editor | Long prompts, editing a plan",
+  "id": "C0024"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "tr",
+  "text": "Ctrl+B | Send running tasks to the background | A long build/test you don't want to wait on",
+  "id": "C0025"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "tr",
+  "text": "Ctrl+O | Transcript viewer | See every tool call in detail",
+  "id": "C0026"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "tr",
+  "text": "Ctrl+T | Toggle Claude's task checklist | Track progress of a multi-step job",
+  "id": "C0027"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "tr",
+  "text": "Ctrl+V | Paste an image | Screenshots of bugs, mockups to implement",
+  "id": "C0028"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "tr",
+  "text": "Option/Alt+P · +T · +O | Switch model · toggle thinking · toggle fast mode | Chapter 15",
+  "id": "C0029"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "p",
+  "text": "You want Claude to look at the output of git log --oneline -20 and summarize what changed this week. What is the fastest way that doesn't make Claude ask for permission to run git?",
+  "id": "C0030"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "p",
+  "text": "Type ! git log --oneline -20. The ! prefix runs the command yourself, adds its output to the conversation, and Claude responds to it. No permission prompt, because you ran it.",
+  "id": "C0031"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "li",
+  "text": "/ commands & skills, @ file mention, ! shell, Esc stop, Esc Esc rewind, Shift+Tab mode.",
+  "id": "C0032"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "li",
+  "text": "claude -c continues, claude -r resumes; name sessions with /rename or -n.",
+  "id": "C0033"
+ },
+ {
+  "where": "term",
+  "level": "1",
+  "kind": "li",
+  "text": "One engine, many surfaces — sessions can move between terminal, desktop, web and phone.",
+  "id": "C0034"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "p",
+  "text": "Everything Claude “knows” in a session lives in its context window: the system prompt, tool definitions, your CLAUDE.md, skill descriptions, every message, every file it read, every command output. The window has a fixed size. When it fills, Claude Code compacts: it replaces older history with a summary. Details get lost in summaries.",
+  "id": "C0035"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "p",
+  "text": "And there is a quieter problem before the window is full: noise. The more irrelevant stuff sits in context — a debugging tangent, three unrelated questions, a 2,000-line log — the worse Claude follows your instructions. Expert users treat context like RAM on a small machine.",
+  "id": "C0036"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Numbers are illustrative. The real window depends on the model (200K is common; some models offer 1M). /context shows your real usage as a colored grid; /autocompact sets when automatic compaction starts.",
+  "id": "C0037"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "p",
+  "text": "Tonight's guests: /compact and /clear.",
+  "id": "C0038"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "div",
+  "text": "/compactI'm the gentle one. I summarize the conversation and keep going. You can steer me: /compact focus on the API changes.",
+  "id": "C0039"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "div",
+  "text": "/clearAnd I'm the honest one. A summary still carries the dead ends and the wrong guesses. New task? Start clean.",
+  "id": "C0040"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "div",
+  "text": "/compactBut then Claude forgets what we decided!",
+  "id": "C0041"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "div",
+  "text": "/clearDecisions belong in files — a plan, a CLAUDE.md line, a commit message. Not in chat history. Then clearing costs nothing.",
+  "id": "C0042"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "p",
+  "text": "Not all context is equal. MCP tools load only their names at start; full schemas are fetched when used (tool search). Skills load only their descriptions; the body loads when triggered. Subagents run in their own window and return only a summary. Hooks cost nothing unless they print output. That's why the extension chapters keep asking “where does this land in context?” — it's the design principle behind all of them. For partial compaction, open the rewind menu (Esc Esc), pick a message and choose Summarize from here or Summarize up to here.",
+  "id": "C0043"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "li",
+  "text": "Context is finite and noise hurts before it's full. /context to look, /clear between unrelated tasks.",
+  "id": "C0044"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "li",
+  "text": "/compact [focus] keeps going with a summary; /btw asks without adding to history.",
+  "id": "C0045"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "li",
+  "text": "Big searches → subagents: their reading stays in their window.",
+  "id": "C0046"
+ },
+ {
+  "where": "ctx",
+  "level": "1",
+  "kind": "li",
+  "text": "Persist decisions in files, not in chat.",
+  "id": "C0047"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "p",
+  "text": "Each session starts blank — except for files Claude Code loads automatically. The main one is CLAUDE.md: plain markdown with build commands, conventions and “never do X” rules. Run /init once and Claude writes a first version by reading your repo. There are several levels, and they add up (they don't override each other):",
+  "id": "C0048"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "tr",
+  "text": "Managed policy | /Library/Application Support/ClaudeCode/CLAUDE.md (macOS), /etc/claude-code/CLAUDE.md (Linux) | Company-wide rules set by IT",
+  "id": "C0049"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "tr",
+  "text": "User | ~/.claude/CLAUDE.md | Your personal preferences, all projects",
+  "id": "C0050"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "tr",
+  "text": "Project | ./CLAUDE.md or ./.claude/CLAUDE.md | Team conventions — commit it",
+  "id": "C0051"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "tr",
+  "text": "Local | ./CLAUDE.local.md | Your private notes for this repo — gitignore it",
+  "id": "C0052"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "tr",
+  "text": "Nested | packages/web/CLAUDE.md | Loaded lazily when Claude reads files in that folder",
+  "id": "C0053"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "tr",
+  "text": "Rules | .claude/rules/*.md with paths: globs | Load only when matching files are touched",
+  "id": "C0054"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "tr",
+  "text": "Auto memory | written by Claude per repo (MEMORY.md index) | Corrections and preferences Claude learned; first 200 lines / 25KB load each session",
+  "id": "C0055"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "The adherence meter is a teaching device, not a measurement. The docs' guidance behind it is real: keep each CLAUDE.md under ~200 lines; longer files consume more context and reduce adherence.",
+  "id": "C0056"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "p",
+  "text": "What goes in a good project CLAUDE.md? Only what Claude can't guess and will need in most sessions:",
+  "id": "C0057"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "pre",
+  "text": "# Build & test - `pnpm dev` starts the app, `pnpm test -- path/to/file` runs one test file - Always run `pnpm typecheck` after changing types # Conventions - Use pnpm, never npm. ES modules only. - API handlers live in src/api/, one file per resource. See @docs/api-style.md # Gotchas - The `legacy/` folder is frozen. Never edit it. - When compacting, preserve the list of modified files and test commands.",
+  "id": "C0058"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "p",
+  "text": "CLAUDE.md is advice, not enforcement. “Never edit .env” in CLAUDE.md usually works; a deny permission rule (chapter 5) or a PreToolUse hook (chapter 11) always works. If a rule must hold every time, don't write it as prose.",
+  "id": "C0059"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "div",
+  "text": "My repo already has an AGENTS.md for other tools. Duplicate it?",
+  "id": "C0060"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "div",
+  "text": "No. Claude Code can read AGENTS.md on its own or alongside CLAUDE.md, or you can import it from CLAUDE.md with @AGENTS.md. Imports work with relative and absolute paths, up to four hops deep.",
+  "id": "C0061"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "div",
+  "text": "How do I see or edit what's loaded?",
+  "id": "C0062"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "div",
+  "text": "/memory lists the loaded files, opens them in your editor, and toggles auto memory. /context shows how many tokens they cost.",
+  "id": "C0063"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "li",
+  "text": "Levels add up: managed + user + project + local + nested + rules + auto memory.",
+  "id": "C0064"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "li",
+  "text": "Keep each CLAUDE.md short (<200 lines). Move procedures to skills, folder-specific rules to .claude/rules/.",
+  "id": "C0065"
+ },
+ {
+  "where": "mem",
+  "level": "1",
+  "kind": "li",
+  "text": "A mistake Claude makes twice → one line in CLAUDE.md. A rule that must never break → hook or deny rule.",
+  "id": "C0066"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "p",
+  "text": "Every tool call passes a gate. Two things decide the outcome: your permission rules (explicit allow / ask / deny lists) and the session's permission mode (the default behavior for anything no rule matches).",
+  "id": "C0067"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "tr",
+  "text": "default (manual) | Reads only | Sensitive work, learning what Claude does",
+  "id": "C0068"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "tr",
+  "text": "acceptEdits | Reads, file edits, and common filesystem commands (mkdir, touch, rm, rmdir, mv, cp, sed) inside the working directories | Iterating on code you review in git",
+  "id": "C0069"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "tr",
+  "text": "plan | Reads (research only, no edits) | Exploring and designing before changing",
+  "id": "C0070"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "tr",
+  "text": "auto | Everything, with a background safety classifier | Long tasks, less prompt fatigue",
+  "id": "C0071"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "tr",
+  "text": "dontAsk | Reads and pre-approved tools; anything that would prompt is denied | Locked-down CI and scripts",
+  "id": "C0072"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "tr",
+  "text": "bypassPermissions | Everything, no checks | Isolated containers / VMs only",
+  "id": "C0073"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "p",
+  "text": "Shift+Tab cycles default → acceptEdits → plan, and optional modes you have enabled slot in after plan. dontAsk is never in the cycle; start it with --permission-mode dontAsk. Rules live in settings.json under permissions and are checked in a fixed order: deny, then ask, then allow. First match wins; specificity does not matter.",
+  "id": "C0074"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Simplified: the real auto classifier sees your messages and Claude's actions (not tool output), and writes to protected paths (like .git) have their own rules. Rule syntax is real — try it in /permissions.",
+  "id": "C0075"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "pre",
+  "text": "// .claude/settings.json (shared with the team — commit it) { \"permissions\": { \"allow\": [\"Bash(npm run *)\", \"Bash(git commit *)\"], \"ask\": [\"Bash(git push *)\"], \"deny\": [\"Read(./.env)\", \"Read(./secrets/**)\", \"Bash(curl *)\"] } }",
+  "id": "C0076"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "p",
+  "text": "Settings come in layers too. For a single key the higher layer wins — but list keys such as permissions.allow and deny are merged across layers: managed policy > command-line flags (--settings) > .claude/settings.local.json (you, this project) > .claude/settings.json (team) > ~/.claude/settings.json (you, everywhere). Not sure where a key belongs? Ask: /update-config allow npm test — or run /fewer-permission-prompts, which scans your history and proposes an allowlist of safe read-only commands.",
+  "id": "C0077"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "p",
+  "text": "An allow rule can't carve an exception out of a deny rule. With deny: Bash(aws *), allow: Bash(aws s3 ls) never fires. And put the * after the subcommand: Bash(git log *) allows only git log …; Bash(git *) allows git push --force too. --dangerously-skip-permissions belongs in a throwaway container, never on your laptop.",
+  "id": "C0078"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "p",
+  "text": "For fewer prompts and real safety on your machine, try the Bash sandbox: /sandbox runs shell commands with OS-level filesystem and network isolation (macOS, Linux, WSL2), and its auto-allow mode lets sandboxed commands run without asking. The sandbox limits what a command can do; permissions limit what Claude may try. Defense in depth uses both.",
+  "id": "C0079"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "li",
+  "text": "Rules: deny → ask → allow, first match wins. Mode decides everything no rule matched.",
+  "id": "C0080"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "li",
+  "text": "Learn in default, iterate in acceptEdits, design in plan, go long in auto, script in dontAsk.",
+  "id": "C0081"
+ },
+ {
+  "where": "perm",
+  "level": "1",
+  "kind": "li",
+  "text": "Team rules in .claude/settings.json, personal ones in settings.local.json.",
+  "id": "C0082"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "p",
+  "text": "The most common beginner move is “implement feature X” as the first prompt. Claude will — and it will solve the problem it guessed, not the one you have. The recommended workflow separates research from execution:",
+  "id": "C0083"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "li",
+  "text": "Explore (plan mode): “read src/auth and explain how sessions are refreshed.” No edits.",
+  "id": "C0084"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "li",
+  "text": "Plan: “plan how to add Google login. Which files change? What's the migration?” Press Ctrl+G to edit the plan yourself in your editor. Approving the plan exits plan mode.",
+  "id": "C0085"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "li",
+  "text": "Code: Claude implements against the plan, checking it off.",
+  "id": "C0086"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "li",
+  "text": "Verify & commit: tests, typecheck, a look at /diff, then “commit with a clear message and open a PR”.",
+  "id": "C0087"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Minutes are illustrative, but the shape is the lesson: planning has a fixed cost that pays off only when the change spans several files or you're unsure of the approach.",
+  "id": "C0088"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "p",
+  "text": "When would you skip plan mode entirely? (Hint: the docs' own rule of thumb — if you can describe the diff in one sentence, skip the plan.)",
+  "id": "C0089"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "div",
+  "text": "What if I don't know enough to write a good spec?",
+  "id": "C0090"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "div",
+  "text": "Let Claude interview you: “I want to add rate limiting. Interview me with questions until you can write a spec to SPEC.md.” Then /clear and start a fresh session that implements SPEC.md. The spec is the handoff — clean context, full intent.",
+  "id": "C0091"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "div",
+  "text": "Can I plan with a stronger model and code with a cheaper one?",
+  "id": "C0092"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "div",
+  "text": "Yes: the opusplan model setting uses Opus in plan mode and Sonnet for execution.",
+  "id": "C0093"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "li",
+  "text": "Explore and plan in plan mode (Shift+Tab or /plan), edit the plan with Ctrl+G.",
+  "id": "C0094"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "li",
+  "text": "Planning pays for multi-file or uncertain work; skip it for one-sentence diffs.",
+  "id": "C0095"
+ },
+ {
+  "where": "plan",
+  "level": "1",
+  "kind": "li",
+  "text": "For big features: interview → SPEC.md → /clear → implement.",
+  "id": "C0096"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "p",
+  "text": "Claude can infer a lot, but not what's in your head. Every fact you leave out becomes a guess, and every guess is a chance to solve the wrong problem. A good prompt is not long — it's specific: where to look, what's wrong, what “done” means, and what not to touch.",
+  "id": "C0097"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "Which file? (Claude greps the whole repo)",
+  "id": "C0098"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "What exactly is broken?",
+  "id": "C0099"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "Which approach and style?",
+  "id": "C0100"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "How do I know I'm done?",
+  "id": "C0101"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "What must not change?",
+  "id": "C0102"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Every ingredient maps to a best practice from the official docs: reference files, describe the symptom, point to existing patterns, give a verification command, state constraints.",
+  "id": "C0103"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "Onboarding question: “How does logging work here? Trace one request from @src/server.ts to the DB.”",
+  "id": "C0104"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "Bug with evidence: paste the stack trace or screenshot (Ctrl+V), say how to reproduce, ask for a failing test first.",
+  "id": "C0105"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "Follow the pattern: “Add a /invoices endpoint like @src/api/orders.ts.”",
+  "id": "C0106"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "TDD: “Write tests for X, confirm they fail, commit them. Then implement until they pass without changing the tests.”",
+  "id": "C0107"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "UI iteration: give a mockup image, ask Claude to screenshot its result and compare, iterate 2–3 times.",
+  "id": "C0108"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "Pipe data in: cat error.log | claude -p \"find the root cause\".",
+  "id": "C0109"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "p",
+  "text": "You can ask for more thinking in plain words (“think hard about edge cases”) or raise the session's effort level with /effort (chapter 15). Rich context beats clever phrasing: a URL to the docs, an image, @-mentioned files, piped logs. If Claude should fetch docs, allow the domain with a rule like WebFetch(domain:docs.stripe.com).",
+  "id": "C0110"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "Where (@file) + symptom + pattern to follow + verification + constraints.",
+  "id": "C0111"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "Give Claude a finish line it can check itself: a test, a command, a screenshot.",
+  "id": "C0112"
+ },
+ {
+  "where": "prompt",
+  "level": "1",
+  "kind": "li",
+  "text": "Two failed corrections in a row → /clear and write a better first prompt.",
+  "id": "C0113"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "p",
+  "text": "Claude Code saves a checkpoint before each prompt: the conversation state plus snapshots of the files Claude edited. Press Esc Esc on an empty prompt (or run /rewind), pick a message, and choose: restore code, restore conversation, or both — or summarize from that point. That makes experiments cheap: let Claude try a bold approach, and rewind if you don't like it.",
+  "id": "C0114"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Real behavior: checkpoints track edits made by Claude's file tools. Changes made by Bash commands (rm, mv, cp), by you outside the session, or by other sessions are not restored. Checkpoints are not a replacement for git.",
+  "id": "C0115"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "tr",
+  "text": "claude -c / --continue | Continue the most recent conversation in this directory",
+  "id": "C0116"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "tr",
+  "text": "claude -r / /resume | Pick any older session (by name or ID)",
+  "id": "C0117"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "tr",
+  "text": "/rename, claude -n name | Name a session so you can resume it by name",
+  "id": "C0118"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "tr",
+  "text": "/branch | Branch the conversation at this point to try something different",
+  "id": "C0119"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "tr",
+  "text": "--fork-session | Resume into a new session ID, leaving the original intact",
+  "id": "C0120"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "tr",
+  "text": "/rewind, Esc Esc | Restore code and/or conversation to a checkpoint, or summarize from there",
+  "id": "C0121"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "tr",
+  "text": "/diff | Review the working tree changes so far",
+  "id": "C0122"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "tr",
+  "text": "/export, /copy | Save the conversation / copy the last answer",
+  "id": "C0123"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "p",
+  "text": "Checkpoints are local undo, git is history. Commit at every green state (“commit this with a descriptive message” is a perfectly good prompt). Then even a rm -rf through Bash is one git checkout away.",
+  "id": "C0124"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "li",
+  "text": "Every prompt = a checkpoint. Esc Esc → restore code, conversation, or both.",
+  "id": "C0125"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "li",
+  "text": "Bash-made file changes are not tracked. Commit often.",
+  "id": "C0126"
+ },
+ {
+  "where": "rewind",
+  "level": "1",
+  "kind": "li",
+  "text": "Name sessions, resume with -c / -r, branch with /branch.",
+  "id": "C0127"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "p",
+  "text": "A skill is a folder with a SKILL.md: YAML frontmatter plus markdown instructions, optionally with scripts and reference files next to it. You invoke it as a command (/deploy staging), or Claude loads it by itself when your task matches its description. Custom slash commands were merged into skills: an old .claude/commands/deploy.md still works and creates /deploy too.",
+  "id": "C0128"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "p",
+  "text": "The trick is progressive disclosure. At session start only each skill's name and description sit in context. The full body loads when the skill is used; files it links load only if Claude opens them. So you can have fifty skills and pay for fifty short descriptions.",
+  "id": "C0129"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "pre",
+  "text": ".claude/skills/release-notes/SKILL.md --- name: release-notes description: Draft release notes from merged PRs since the last tag. Use when asked for a changelog or release notes. disable-model-invocation: true # only I can trigger it (/release-notes) allowed-tools: Bash(git log *) Bash(gh pr list *) context: fork # run in a forked subagent, return a summary --- 1. Find the last tag with `git describe --tags --abbrev=0`. 2. List merged PRs since then … 3. Group by feat / fix / chore. Output markdown. See [template.md](template.md).",
+  "id": "C0130"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Token sizes are illustrative. /skills lists your skills; /skill-doctor shows what each one costs in context and how often it triggers.",
+  "id": "C0131"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "tr",
+  "text": "description | How Claude decides to use it. Say what and when. Vague = wrong triggers.",
+  "id": "C0132"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "tr",
+  "text": "disable-model-invocation: true | Only you can run it. Use for side effects (deploy, publish). Zero context cost until used.",
+  "id": "C0133"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "tr",
+  "text": "user-invocable: false | Only Claude uses it (background knowledge); hidden from the / menu.",
+  "id": "C0134"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "tr",
+  "text": "allowed-tools | Tools pre-approved while the skill runs",
+  "id": "C0135"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "tr",
+  "text": "context: fork + agent | Run in a forked subagent; only the result returns",
+  "id": "C0136"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "tr",
+  "text": "model, effort | Override model / effort while the skill is active",
+  "id": "C0137"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "tr",
+  "text": "paths | Auto-load only when working with matching files",
+  "id": "C0138"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "tr",
+  "text": "arguments, argument-hint | Named args ($name) and autocomplete hint",
+  "id": "C0139"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "tr",
+  "text": "hooks | Hooks registered when the skill is invoked",
+  "id": "C0140"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "p",
+  "text": "Where skills live: ~/.claude/skills/ (you, all projects), .claude/skills/ (the repo — commit it), managed (your company), and plugins (namespaced like /my-plugin:review). Claude Code also bundles skills you get for free: /code-review, /simplify, /debug, /batch, /loop, /run, /verify, /doctor, /fewer-permission-prompts and more.",
+  "id": "C0141"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "p",
+  "text": "Tonight's guests: CLAUDE.md and a Skill.",
+  "id": "C0142"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "div",
+  "text": "CLAUDE.mdI'm loaded in every session. Every single one. People love me.",
+  "id": "C0143"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "div",
+  "text": "SkillAnd they pay for you every single request. I show up only when I'm useful.",
+  "id": "C0144"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "div",
+  "text": "CLAUDE.mdSo what should live in me?",
+  "id": "C0145"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "div",
+  "text": "SkillFacts needed almost always: build commands, conventions. Procedures and reference docs — the deploy checklist, the API style guide — give them to me.",
+  "id": "C0146"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "li",
+  "text": "Skill = SKILL.md + optional files. Invoked with /name or auto-loaded by description.",
+  "id": "C0147"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "li",
+  "text": "Only descriptions cost context until use. Write sharp descriptions.",
+  "id": "C0148"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "li",
+  "text": "Third time you paste the same instructions → make it a skill.",
+  "id": "C0149"
+ },
+ {
+  "where": "skills",
+  "level": "1",
+  "kind": "li",
+  "text": "Side effects → disable-model-invocation: true. Heavy work → context: fork.",
+  "id": "C0150"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "p",
+  "text": "A subagent is a separate Claude instance with its own context window, its own system prompt, and optionally its own tools, model and permissions. The main session hands it a task; it reads, searches, runs things, and returns only a summary. The 40 files it read never enter your main context.",
+  "id": "C0151"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "p",
+  "text": "Claude uses built-in subagents on its own: Explore (read-only codebase search), Plan (research during plan mode) and general-purpose (explore + modify, multi-step). You can also ask: “use subagents to investigate how payments, auth and emails each handle retries.” Several can run in parallel.",
+  "id": "C0152"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Token counts are illustrative. Subagents spend their own tokens — delegation mainly protects your main context (a cheaper subagent model, e.g. Haiku, can also cut cost). Parallel subagents finish sooner than sequential reading.",
+  "id": "C0153"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "pre",
+  "text": ".claude/agents/security-reviewer.md --- name: security-reviewer description: Reviews diffs for injection, authz and secret-handling bugs. Use after changes to auth or API code. tools: Read, Grep, Glob, Bash model: opus permissionMode: plan # read-only memory: project # keeps its own notes across sessions --- You are a senior application security engineer. For each finding give file:line, the exploit scenario, and the minimal fix. No style comments.",
+  "id": "C0154"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "p",
+  "text": "Other useful fields: skills (preload full skills), mcpServers, hooks, maxTurns, effort, isolation: worktree (work on its own copy of the repo), background: true. Put agents in .claude/agents/ (team) or ~/.claude/agents/ (you). The easiest way to write one: ask Claude to create it.",
+  "id": "C0155"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "div",
+  "text": "Skill with context: fork vs subagent — what's the difference?",
+  "id": "C0156"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "div",
+  "text": "A skill is content (instructions); a subagent is a worker (a context with a role, tools and model). context: fork runs a skill's content inside a worker; a subagent's skills: field preloads content into a worker. They compose.",
+  "id": "C0157"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "div",
+  "text": "Can a subagent see my conversation?",
+  "id": "C0158"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "div",
+  "text": "A normal subagent sees only what the lead passes in the prompt (plus CLAUDE.md and git status, except Explore and Plan which skip them). A fork (/fork, /subtask) copies the whole conversation so far.",
+  "id": "C0159"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "p",
+  "text": "You just finished a feature. Design an “adversarial review” step that doesn't share your session's blind spots.",
+  "id": "C0160"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "p",
+  "text": "Spawn a fresh reviewer subagent (or a second session) that sees only the diff and the spec, not your conversation — it can't inherit the assumptions you made while building. Or run /code-review, which does exactly this; /code-review ultra runs a deep multi-agent review in the cloud.",
+  "id": "C0161"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "li",
+  "text": "Subagent = isolated context + role + tools + model. Returns a summary.",
+  "id": "C0162"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "li",
+  "text": "Use for research that reads a lot, parallel independent questions, and unbiased review.",
+  "id": "C0163"
+ },
+ {
+  "where": "sub",
+  "level": "1",
+  "kind": "li",
+  "text": "Define in .claude/agents/*.md; restrict tools and permissionMode for safety.",
+  "id": "C0164"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "p",
+  "text": "Everything so far is advice the model interprets. A hook is different: Claude Code itself runs your shell command (or HTTP call, MCP tool, prompt, or subagent) when a lifecycle event fires. It always runs. It can block actions, inject context, or just log. Configure hooks in settings.json; /hooks lets you browse them (read-only).",
+  "id": "C0165"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "pre",
+  "text": "{ \"hooks\": { \"PreToolUse\": [{ \"matcher\": \"Bash\", \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"$CLAUDE_PROJECT_DIR\\\"/.claude/hooks/block-dangerous.sh\" }] }], \"PostToolUse\": [{ \"matcher\": \"Edit|Write\", \"hooks\": [{ \"type\": \"command\", \"command\": \"npx prettier --write \\\"$(jq -r .tool_input.file_path)\\\"\" }] }] } }",
+  "id": "C0166"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "p",
+  "text": "The hook gets a JSON payload on stdin (tool name, input, session info). Exit code 0 = go on; exit code 2 = block, and stderr goes back as the reason (for PreToolUse, Claude reads it and adjusts). For finer control, print JSON with a decision.",
+  "id": "C0167"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Simplified to the main events. The full list also has PermissionRequest, PostToolUseFailure, SubagentStart/Stop, PreCompact/PostCompact, Notification, FileChanged, CwdChanged, WorktreeCreate and more.",
+  "id": "C0168"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "tr",
+  "text": "SessionStart | Inject context: current sprint, open issues, env setup",
+  "id": "C0169"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "tr",
+  "text": "UserPromptSubmit | Add context or reject prompts (e.g. leaked secrets)",
+  "id": "C0170"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "tr",
+  "text": "PreToolUse | Block dangerous commands, protect files, enforce rules",
+  "id": "C0171"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "tr",
+  "text": "PermissionRequest | Auto-approve or deny a permission prompt by policy",
+  "id": "C0172"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "tr",
+  "text": "PostToolUse | Format, lint, typecheck after edits — exit 2 (stderr) or JSON additionalContext feeds problems back to Claude",
+  "id": "C0173"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "tr",
+  "text": "Stop | Run tests before Claude may finish; notify you",
+  "id": "C0174"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "tr",
+  "text": "Notification | Desktop / phone ping when Claude waits for input",
+  "id": "C0175"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "tr",
+  "text": "PreCompact | Save a transcript backup before compaction",
+  "id": "C0176"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "tr",
+  "text": "SessionEnd | Cleanup, logging, metrics",
+  "id": "C0177"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "p",
+  "text": "Hooks run with your user's permissions, automatically, on every matching event. Review any hook you copy (and any plugin that ships hooks) like you'd review a script you pipe into bash. Quote variables, use absolute paths via $CLAUDE_PROJECT_DIR, and keep them fast — a slow PostToolUse hook slows every edit.",
+  "id": "C0178"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "li",
+  "text": "Hook = deterministic code on a lifecycle event. CLAUDE.md = a request; hook = a guarantee.",
+  "id": "C0179"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "li",
+  "text": "Exit 2 blocks (PreToolUse) and stderr becomes Claude's feedback; JSON output can add context. Plain stdout of most events goes only to the debug log.",
+  "id": "C0180"
+ },
+ {
+  "where": "hooks",
+  "level": "1",
+  "kind": "li",
+  "text": "Best starter hooks: format after edit, block dangerous Bash, notify when waiting.",
+  "id": "C0181"
+ },
+ {
+  "where": "mcp",
+  "level": "1",
+  "kind": "p",
+  "text": "MCP (Model Context Protocol) connects Claude to external systems as tools: GitHub, Sentry, Linear, Notion, your database, a browser. If you keep copying data from a browser tab into the chat, that system wants to be an MCP server.",
+  "id": "C0182"
+ },
+ {
+  "where": "mcp",
+  "level": "1",
+  "kind": "pre",
+  "text": "# remote HTTP server (OAuth in /mcp) claude mcp add --transport http notion https://mcp.notion.com/mcp # local stdio server: everything after -- is the server command claude mcp add --transport stdio db -- npx -y @bytebase/dbhub --dsn \"postgresql://readonly:…@localhost:5432/app\" # share with the team via .mcp.json claude mcp add --scope project --transport http sentry https://mcp.sentry.dev/mcp",
+  "id": "C0183"
+ },
+ {
+  "where": "mcp",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Tool search is on by default: only tool names load at start; a full schema loads when Claude needs that tool. /mcp shows status and handles OAuth; /context all shows how many tokens each loaded MCP tool uses.",
+  "id": "C0184"
+ },
+ {
+  "where": "mcp",
+  "level": "1",
+  "kind": "p",
+  "text": "MCP scopes override by name: local > project > user. Local and user servers are stored in ~/.claude.json; project servers in .mcp.json at the repo root, which teammates approve on first use. Never commit secrets there — use ${ENV_VAR} expansion.",
+  "id": "C0185"
+ },
+ {
+  "where": "mcp",
+  "level": "1",
+  "kind": "p",
+  "text": "Plugins are the packaging layer: one installable unit bundling skills, subagents, hooks, MCP servers (and LSP code-intelligence servers). Add a marketplace once, then install from it:",
+  "id": "C0186"
+ },
+ {
+  "where": "mcp",
+  "level": "1",
+  "kind": "pre",
+  "text": "/plugin marketplace add your-org/claude-plugins /plugin install commit-commands@claude-plugins-official /plugin # browse, enable, disable, choose scope",
+  "id": "C0187"
+ },
+ {
+  "where": "mcp",
+  "level": "1",
+  "kind": "p",
+  "text": "MCP gives access; a skill gives know-how. The strongest combo is both: an MCP server for your database plus a skill that documents your schema, naming and “never query prod without LIMIT” rules. For typed languages, a code intelligence plugin (LSP) lets Claude jump to definitions and see type errors after each edit instead of grepping — fewer file reads, less context.",
+  "id": "C0188"
+ },
+ {
+  "where": "mcp",
+  "level": "1",
+  "kind": "p",
+  "text": "An MCP server that fetches untrusted content (web pages, issues, emails) can carry prompt injection. Use servers you trust, keep permission prompts on for tools with side effects, and prefer read-only credentials.",
+  "id": "C0189"
+ },
+ {
+  "where": "mcp",
+  "level": "1",
+  "kind": "li",
+  "text": "MCP = external tools. claude mcp add, scopes local > project > user, /mcp to manage.",
+  "id": "C0190"
+ },
+ {
+  "where": "mcp",
+  "level": "1",
+  "kind": "li",
+  "text": "Only tool names cost context until a tool is used.",
+  "id": "C0191"
+ },
+ {
+  "where": "mcp",
+  "level": "1",
+  "kind": "li",
+  "text": "Plugins bundle skills + agents + hooks + MCP; share them through a marketplace when a 2nd repo needs the same setup.",
+  "id": "C0192"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "p",
+  "text": "Once one session works well, the next bottleneck is you waiting. Claude Code has several ways to run more than one thing at once. The question that separates them: who holds the plan?",
+  "id": "C0193"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Availability varies: agent teams are experimental (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1), routines and agent view are in research preview, dynamic workflows need a paid plan or API / cloud-provider access (on Pro, switch them on in /config).",
+  "id": "C0194"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "tr",
+  "text": "Subagents | “use subagents to…”, /subtask | Claude, turn by turn",
+  "id": "C0195"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "tr",
+  "text": "Worktrees | claude -w feature-auth — own checkout under .claude/worktrees/ | You, one session each",
+  "id": "C0196"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "tr",
+  "text": "Background sessions | /background, claude agents (agent view), Ctrl+B for tasks | You dispatch, check back later",
+  "id": "C0197"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "tr",
+  "text": "Agent teams | Lead + teammates with a shared task list and messaging | The lead agent",
+  "id": "C0198"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "tr",
+  "text": "Dynamic workflows | Ask for “a workflow” | A script Claude writes",
+  "id": "C0199"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "tr",
+  "text": "/batch | Bundled skill: splits a big change across subagents in their own worktrees | Claude, following the skill",
+  "id": "C0200"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "tr",
+  "text": "/goal | “until all tests pass” — keeps taking turns until a checker says done | A completion condition",
+  "id": "C0201"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "tr",
+  "text": "/loop | /loop 5m check the deploy — repeats while the session is open | A timer",
+  "id": "C0202"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "tr",
+  "text": "Routines | /schedule — cloud runs on cron, API or GitHub events, laptop closed | A trigger",
+  "id": "C0203"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "li",
+  "text": "claude -w search, claude -w billing-fix, claude -w docs in three terminal tabs — each gets its own branch and files.",
+  "id": "C0204"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "li",
+  "text": "Plan each in plan mode, approve, switch to auto or acceptEdits.",
+  "id": "C0205"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "li",
+  "text": "Set a Notification hook so you get pinged when one needs you; work the queue.",
+  "id": "C0206"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "li",
+  "text": "Each session opens its own PR; review with /code-review in a fresh session.",
+  "id": "C0207"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "p",
+  "text": "Parallel agents multiply review work, not only output. Two sessions editing the same files in one checkout will fight — isolate with worktrees. And more agents cost more tokens: agent teams in particular use a separate context per teammate.",
+  "id": "C0208"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "li",
+  "text": "Side quest → subagent. Separate features → worktrees. Debate → agent team. Huge cross-checked fan-out → workflow; big mechanical change → /batch.",
+  "id": "C0209"
+ },
+ {
+  "where": "par",
+  "level": "1",
+  "kind": "li",
+  "text": "Keep going until done → /goal. Poll → /loop. Laptop closed → routine via /schedule.",
+  "id": "C0210"
+ },
+ {
+  "where": "ci",
+  "level": "1",
+  "kind": "p",
+  "text": "claude -p \"prompt\" runs one task non-interactively and prints the result. Everything you learned still applies — CLAUDE.md, skills, hooks, MCP — so it slots into scripts, pre-commit checks, and CI.",
+  "id": "C0211"
+ },
+ {
+  "where": "ci",
+  "level": "1",
+  "kind": "pre",
+  "text": "# one-off, pipe in, JSON out git diff main | claude -p \"review for bugs; reply as a list\" --output-format json # structured output validated against a schema claude -p \"list TODOs as JSON\" --json-schema '{\"type\":\"array\",\"items\":{\"type\":\"string\"}}' # locked down for CI: listed tools + reads only; anything that would prompt is denied claude -p \"run the tests and fix failures\" \\ --permission-mode dontAsk --allowedTools \"Read\" \"Edit\" \"Bash(npm test *)\" \\ --max-turns 20 --max-budget-usd 5 # fan out over files for f in $(git ls-files 'src/**/*.js'); do claude -p \"migrate $f from CommonJS to ESM, keep behavior\" --allowedTools \"Read\" \"Edit\" done",
+  "id": "C0212"
+ },
+ {
+  "where": "ci",
+  "level": "1",
+  "kind": "pre",
+  "text": "- uses: anthropics/claude-code-action@v1 with: anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }} prompt: \"Review this PR for bugs. Run the billing tests.\" claude_args: --permission-mode dontAsk --allowedTools \"Read\" \"Bash(npm test *)\"",
+  "id": "C0213"
+ },
+ {
+  "where": "ci",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Based on anthropics/claude-code-action@v1. Run /install-github-app once: it installs the app, adds the secret and opens a PR with the workflow files; after merging, @claude in an issue or PR comment triggers Claude too. A workflow with a prompt runs in automation mode and writes results to the run log unless Claude has a tool that can comment.",
+  "id": "C0214"
+ },
+ {
+  "where": "ci",
+  "level": "1",
+  "kind": "p",
+  "text": "--output-format stream-json emits events as they happen (for dashboards and bots). --bare skips auto-discovery of hooks, skills, plugins, MCP and CLAUDE.md for reproducible scripts. --append-system-prompt adds instructions. -c -p continues a conversation in a script. For full control (tool approval callbacks, native objects) use the Agent SDK in Python or TypeScript — it is the same engine.",
+  "id": "C0215"
+ },
+ {
+  "where": "ci",
+  "level": "1",
+  "kind": "li",
+  "text": "-p + --output-format json|stream-json + --json-schema for machines.",
+  "id": "C0216"
+ },
+ {
+  "where": "ci",
+  "level": "1",
+  "kind": "li",
+  "text": "CI: --permission-mode dontAsk + an exact --allowedTools list + --max-turns/--max-budget-usd.",
+  "id": "C0217"
+ },
+ {
+  "where": "ci",
+  "level": "1",
+  "kind": "li",
+  "text": "GitHub: /install-github-app; scheduled or event-driven cloud runs: routines.",
+  "id": "C0218"
+ },
+ {
+  "where": "model",
+  "level": "1",
+  "kind": "p",
+  "text": "Two dials decide how hard Claude thinks. The model (/model, --model, Option/Alt+P) picks the brain; the effort level (/effort, --effort) picks how much it reasons per step: low, medium, high, xhigh, max. Aliases track the recommended version for your provider: haiku, sonnet, opus, fable, best; plus opusplan (Opus to plan, Sonnet to execute) and [1m] variants for a 1M-token window.",
+  "id": "C0219"
+ },
+ {
+  "where": "model",
+  "level": "1",
+  "kind": "tr",
+  "text": "Suggested | sonnet · /effort medium–high",
+  "id": "C0220"
+ },
+ {
+  "where": "model",
+  "level": "1",
+  "kind": "tr",
+  "text": "Reasoning depth |",
+  "id": "C0221"
+ },
+ {
+  "where": "model",
+  "level": "1",
+  "kind": "tr",
+  "text": "Token spend |",
+  "id": "C0222"
+ },
+ {
+  "where": "model",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Bars are qualitative. Real defaults: effort is high on most models (Opus 5.5 defaults to medium). Fast mode runs the same Opus model with faster output at a higher price, not a smaller model.",
+  "id": "C0223"
+ },
+ {
+  "where": "model",
+  "level": "1",
+  "kind": "div",
+  "text": "How do I see what I'm spending?",
+  "id": "C0224"
+ },
+ {
+  "where": "model",
+  "level": "1",
+  "kind": "div",
+  "text": "/usage (alias /cost) shows session cost and plan limits; /context shows what fills the window; a custom status line (/statusline) can show model, context % and cost all the time.",
+  "id": "C0225"
+ },
+ {
+  "where": "model",
+  "level": "1",
+  "kind": "div",
+  "text": "Which cost levers matter?",
+  "id": "C0226"
+ },
+ {
+  "where": "model",
+  "level": "1",
+  "kind": "div",
+  "text": "Context matters as much as the model: token costs scale with context size, so clearing between tasks, lean CLAUDE.md, subagents for heavy reading and fewer idle MCP servers all cut spend. Then pick the smallest model and effort that do the job, and raise them for the hard parts.",
+  "id": "C0227"
+ },
+ {
+  "where": "model",
+  "level": "1",
+  "kind": "li",
+  "text": "Model = which brain; effort = how long it thinks. Raise both for design and hard debugging only.",
+  "id": "C0228"
+ },
+ {
+  "where": "model",
+  "level": "1",
+  "kind": "li",
+  "text": "opusplan: strong planning, cheaper execution. Subagents can use model: haiku for search.",
+  "id": "C0229"
+ },
+ {
+  "where": "model",
+  "level": "1",
+  "kind": "li",
+  "text": "Watch /usage and /context; context hygiene is one of the biggest savings.",
+  "id": "C0230"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "p",
+  "text": "Experts don't know secret commands. They build a setup over time, each piece triggered by a real annoyance, and they keep sessions clean. The official docs list the order most teams add things:",
+  "id": "C0231"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "tr",
+  "text": "Claude gets a convention or command wrong twice | A line in CLAUDE.md",
+  "id": "C0232"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "tr",
+  "text": "You keep asking for shorter / more explained answers | An output style (/output-style)",
+  "id": "C0233"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "tr",
+  "text": "You type the same starting prompt again | A user-invocable skill",
+  "id": "C0234"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "tr",
+  "text": "You paste the same playbook for the third time | A skill",
+  "id": "C0235"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "tr",
+  "text": "You copy data from a browser tab Claude can't see | An MCP server",
+  "id": "C0236"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "tr",
+  "text": "A side task floods the chat with output | A subagent",
+  "id": "C0237"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "tr",
+  "text": "Something must happen every time | A hook",
+  "id": "C0238"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "tr",
+  "text": "A second repo needs the same setup | A plugin",
+  "id": "C0239"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "figcaption",
+  "text": "Your ticks are saved only in this browser (localStorage), never sent anywhere.",
+  "id": "C0240"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "li",
+  "text": "Start clean: one task per session, named (claude -n billing-bug).",
+  "id": "C0241"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "li",
+  "text": "Explore in plan mode with @ files; for big work, interview → SPEC.md.",
+  "id": "C0242"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "li",
+  "text": "Give a finish line (test / command / screenshot); switch to acceptEdits or auto.",
+  "id": "C0243"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "li",
+  "text": "Steer early with Esc; rewind bad paths instead of arguing with them.",
+  "id": "C0244"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "li",
+  "text": "Verify: tests, /diff, /code-review in a fresh context. Commit at green.",
+  "id": "C0245"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "li",
+  "text": "Harvest: turn the repeated correction into a CLAUDE.md line, skill or hook. /clear.",
+  "id": "C0246"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "li",
+  "text": "Grow your setup from real triggers; prune CLAUDE.md ruthlessly.",
+  "id": "C0247"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "li",
+  "text": "Kitchen-sink sessions, endless corrections, bloated CLAUDE.md, no verification, unscoped exploration — the five killers.",
+  "id": "C0248"
+ },
+ {
+  "where": "expert",
+  "level": "1",
+  "kind": "li",
+  "text": "Always close the loop: something Claude can run to prove it's done.",
+  "id": "C0249"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "p",
+  "text": "14 questions. Each tests a mechanism from the chapters, not just a command name.",
+  "id": "C0250"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "claude -c / -r / -n | Continue / resume / name a session | Picking work back up",
+  "id": "C0251"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "/init, CLAUDE.md | Project memory loaded every session | Build commands, conventions (<200 lines)",
+  "id": "C0252"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": ".claude/rules/*.md | Rules scoped with paths: globs | Folder- or language-specific guidance",
+  "id": "C0253"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "/memory | Edit loaded memory, toggle auto memory | Checking what Claude “knows”",
+  "id": "C0254"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "Shift+Tab, /plan | Cycle modes / enter plan mode | Explore before editing",
+  "id": "C0255"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "--permission-mode | default · acceptEdits · plan · auto · dontAsk · bypassPermissions | Choosing autonomy",
+  "id": "C0256"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "/permissions | allow / ask / deny rules (deny → ask → allow) | Fewer prompts, hard limits",
+  "id": "C0257"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "/sandbox | OS-level isolation for Bash | Safer autonomy on your machine",
+  "id": "C0258"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "/context, /usage | Context grid / cost and limits | Sessions getting slow or pricey",
+  "id": "C0259"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "/clear, /compact [focus] | Reset / summarize context | Between tasks / long tasks",
+  "id": "C0260"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "/btw | Side question, not added to history | Quick lookups mid-task",
+  "id": "C0261"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "Esc · Esc Esc · /rewind | Interrupt · rewind code/conversation | Wrong direction, failed experiment",
+  "id": "C0262"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "@file, !cmd, Ctrl+V | Mention file · run shell · paste image | Giving precise context",
+  "id": "C0263"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": ".claude/skills/x/SKILL.md | Reusable skill, /x | Repeated playbooks",
+  "id": "C0264"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": ".claude/agents/x.md | Custom subagent | Isolated research, reviews, roles",
+  "id": "C0265"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "settings.json → hooks | Code on lifecycle events; exit 2 blocks | Must-always rules, formatting, alerts",
+  "id": "C0266"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "claude mcp add, /mcp, .mcp.json | External tools (local > project > user) | GitHub, DBs, browsers, trackers",
+  "id": "C0267"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "/plugin | Install bundles from marketplaces | Sharing a setup across repos",
+  "id": "C0268"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "claude -w name | Session in its own git worktree | Parallel features",
+  "id": "C0269"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "/goal · /loop · /schedule | Until done · on interval · cloud routine | Long or recurring work",
+  "id": "C0270"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "claude -p … --output-format json | Headless run | Scripts, CI, pipes",
+  "id": "C0271"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "/model · /effort · /fast | Brain · thinking depth · faster output | Hard vs routine tasks",
+  "id": "C0272"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "/code-review [ultra] | Review diff / deep cloud multi-agent review | Before merging",
+  "id": "C0273"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "tr",
+  "text": "/doctor, /release-notes | Diagnose setup / what changed | Something looks off",
+  "id": "C0274"
+ },
+ {
+  "where": "final",
+  "level": "1",
+  "kind": "p",
+  "text": "You went from “what is an agent” through context, memory, permissions, planning, prompting and rewind, to skills, subagents, hooks, MCP, parallel sessions, CI and model choice. Look at the worry list you wrote in chapter 0: wrong edits (plan mode, verification, rewind), deleted files (permissions, sandbox, hooks, git), forgetting (CLAUDE.md, auto memory, specs), bills (context hygiene, effort, budgets). Next step: pick one annoyance from this week and add exactly one piece of setup that removes it. Repeat weekly.",
+  "id": "C0275"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "1. What most improves the quality of Claude's result on a bug fix? → A way for Claude to verify its work, such as a failing test it must make pass — 💡 The loop is gather → act → verify. With a check it can run, Claude finds its own mistakes; without one, you are the test suite.",
+  "id": "C0276"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "2. Your session has been going for two hours across three unrelated tasks and answers are getting worse. Best move? → /clear and start the next task fresh, with decisions saved in files — 💡 Noise hurts before the window is full, and summaries keep traces of dead ends. /clear between unrelated tasks; persist decisions in files.",
+  "id": "C0277"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "3. Where does a nested packages/web/CLAUDE.md get loaded? → Only when Claude reads files in packages/web/ — 💡 Files above the working directory load at launch; nested ones load on demand when Claude works in that folder.",
+  "id": "C0278"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "4. You have deny: Bash(aws *) and allow: Bash(aws s3 ls). What happens to \"aws s3 ls\"? → Denied — deny is checked first and first match wins — 💡 Rules are evaluated deny → ask → allow; first match wins, specificity does not matter. An allow can't carve an exception out of a deny.",
+  "id": "C0279"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "5. Which permission mode fits a CI job with an exact list of allowed tools and no human present? → dontAsk — 💡 dontAsk denies anything that would prompt, so only reads and pre-approved tools run.",
+  "id": "C0280"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "6. When is plan mode NOT worth it? → When you could describe the diff in one sentence — 💡 Planning has a fixed cost; it pays off for multi-file, uncertain or unfamiliar work. One-sentence diffs: just do it.",
+  "id": "C0281"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "7. Claude deleted a file with a Bash rm, then you rewound code to an earlier checkpoint. Is the file back? → No, checkpoints don't track changes made by Bash commands — 💡 Checkpoints track edits made through Claude's file tools. Bash-made changes aren't restored — commit often.",
+  "id": "C0282"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "8. You want a /deploy workflow that Claude must never start on its own. Which skill setting? → disable-model-invocation: true — 💡 disable-model-invocation: true hides the skill from Claude until you type /deploy — and costs no context until then.",
+  "id": "C0283"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "9. Why does a skill library of 50 skills not blow up your context window? → Only names and descriptions load at start; a skill's body loads when it's used — 💡 Progressive disclosure: descriptions every request, full body on use, linked files only if opened.",
+  "id": "C0284"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "10. Main benefit of delegating a broad codebase search to a subagent? → The file reading happens in its own context; only a summary returns to yours — 💡 Isolation, not price: the subagent spends its own tokens, but your main context stays clean.",
+  "id": "C0285"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "11. \"Never delete files outside the project\" must hold every time. Where do you put it? → In a PreToolUse hook that exits with code 2 on violation (and/or a deny rule) — 💡 CLAUDE.md is a request the model interprets. Hooks and deny rules are enforced by Claude Code itself.",
+  "id": "C0286"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "12. You add the same MCP server named \"db\" at local and project scope. Which one is used? → Local — precedence is local > project > user — 💡 MCP servers override by name: local > project > user.",
+  "id": "C0287"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "13. You need three independent features built in parallel without sessions overwriting each other's files. Use… → Three sessions, each started with claude -w <name> (git worktrees) — 💡 Worktrees give each session its own checkout and branch while sharing history.",
+  "id": "C0288"
+ },
+ {
+  "where": "quiz",
+  "level": "1",
+  "kind": "quiz",
+  "text": "14. Token costs scale with context size. Which everyday habit therefore cuts cost reliably? → Context hygiene: /clear between tasks, lean CLAUDE.md, subagents for heavy reading — 💡 Token costs scale with context size, so keeping it lean is the first lever the docs list — then match model and effort to the task.",
+  "id": "C0289"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "Press ▶ to watch Claude gather, act and verify.",
+  "id": "C0290"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "Gather: beyond CLAUDE.md and auto memory, Claude knows nothing about this code yet, so it searches and reads first.",
+  "id": "C0291"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "expects session valid until expiry",
+  "id": "C0292"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "Act: a hypothesis becomes an edit.",
+  "id": "C0293"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "No tests exist, so Claude has nothing to run. It reports success based on reading alone.",
+  "id": "C0294"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "✓ Done: fixed the comparison in isValid().",
+  "id": "C0295"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "…in production: users still logged out early (refresh bug untouched)",
+  "id": "C0296"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "Plausible, wrong, shipped. The second bug (token refresh) was never exercised. Without a way to verify, you are the test suite.",
+  "id": "C0297"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "Verify: run the tests. The loop closes itself.",
+  "id": "C0298"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "A failing test is information. Back to gathering, with a sharper question.",
+  "id": "C0299"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "refresh scheduled exactly at expiry",
+  "id": "C0300"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "schedule refresh at expiresAt − 60s",
+  "id": "C0301"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "✓ Fixed two bugs; all auth tests pass.",
+  "id": "C0302"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "Done — and proven. Two bugs, found because the loop could check itself. Same model, same prompt; the difference is the test suite.",
+  "id": "C0303"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "Claude starts writing its own date comparison helper…",
+  "id": "C0304"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "stop — we already have isExpired() in utils/time.ts, use that",
+  "id": "C0305"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "Esc stopped the step before a duplicate helper landed. Your message steers the next step.",
+  "id": "C0306"
+ },
+ {
+  "where": "js:1. agentic loop",
+  "level": "-",
+  "kind": "script",
+  "text": "Steered early, cheap fix. Correcting after 2 steps costs little; after 20 it costs a rewind.",
+  "id": "C0307"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "The prompt bar at the bottom shows the permission mode — watch it change.",
+  "id": "C0308"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "/ opens the command menu: built-in commands, bundled skills and your own skills. Type to filter.",
+  "id": "C0309"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "/compact — summarize conversation/config — settings/context — visualize context usage/code-review — review the diff",
+  "id": "C0310"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "@ autocompletes a file path and puts that file into context directly — no search needed.",
+  "id": "C0311"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "Tokens refresh 60s before expiry: scheduleRefresh() sets a timer from expiresAt − 60_000…",
+  "id": "C0312"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "! runs a shell command yourself. The output lands in the conversation and Claude responds to it. No permission prompt.",
+  "id": "C0313"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "● One modified file (session.ts) and an untracked notes.md. Want me to commit the fix and ignore notes.md?",
+  "id": "C0314"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "Manual: Claude asks before edits and commands.",
+  "id": "C0315"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "Accept edits: file edits and common fs commands run without asking.",
+  "id": "C0316"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "Auto mode: a classifier model reviews actions instead of you and blocks risky ones. It appears in the cycle when auto mode is available (supported model, not turned off by your org); on Pro, Max and Team it is the default starting mode.",
+  "id": "C0317"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "/btw asks a side question. The answer is shown but never enters conversation history — zero context cost later.",
+  "id": "C0318"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "(side answer · not saved) Starts the session in its own git worktree under .claude/worktrees/, on a new branch.",
+  "id": "C0319"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "On an empty prompt, Esc Esc opens the rewind menu: every prompt is a checkpoint.",
+  "id": "C0320"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "1 · explain the auth flow2 · refactor session.ts to classes3 · also rename every file to kebab-case",
+  "id": "C0321"
+ },
+ {
+  "where": "js:2. terminal",
+  "level": "-",
+  "kind": "script",
+  "text": "⏪ Restore code and conversation to before “refactor session.ts to classes”? yes",
+  "id": "C0322"
+ },
+ {
+  "where": "js:3. context window",
+  "level": "-",
+  "kind": "script",
+  "text": "A fresh session already uses some context for the system prompt, tools and CLAUDE.md.",
+  "id": "C0323"
+ },
+ {
+  "where": "js:3. context window",
+  "level": "-",
+  "kind": "script",
+  "text": "Auto-compact! The window hit the threshold, so history was replaced by a summary. It happened mid-task, on its own schedule — and the summary may drop details you needed.",
+  "id": "C0324"
+ },
+ {
+  "where": "js:3. context window",
+  "level": "-",
+  "kind": "script",
+  "text": "/compact: history → summary. You chose the moment and can pass a focus (/compact keep the API decisions). Noise shrinks too, but its traces live on in the summary.",
+  "id": "C0325"
+ },
+ {
+  "where": "js:3. context window",
+  "level": "-",
+  "kind": "script",
+  "text": "+45K: three big files. Useful, but big. File reads dominate context usage — name the exact file and function so Claude reads less (note: @file pulls in the whole file).",
+  "id": "C0326"
+ },
+ {
+  "where": "js:3. context window",
+  "level": "-",
+  "kind": "script",
+  "text": "+14K of noise: an unrelated question and its answer. It stays in context and competes with your real task for attention. New topic → /clear or /btw.",
+  "id": "C0327"
+ },
+ {
+  "where": "js:3. context window",
+  "level": "-",
+  "kind": "script",
+  "text": "A subagent does the searching in its own window…",
+  "id": "C0328"
+ },
+ {
+  "where": "js:3. context window",
+  "level": "-",
+  "kind": "script",
+  "text": "+2K in the main window: only the subagent's summary came back. The 60K of reading stayed over there.",
+  "id": "C0329"
+ },
+ {
+  "where": "js:3. context window",
+  "level": "-",
+  "kind": "script",
+  "text": "/btw: the answer appears, but never enters history. Zero tokens added.",
+  "id": "C0330"
+ },
+ {
+  "where": "js:3. context window",
+  "level": "-",
+  "kind": "script",
+  "text": "/clear: back to a fresh window. System prompt and memory reload; everything else is gone. Perfect between unrelated tasks — if decisions were saved in files.",
+  "id": "C0331"
+ },
+ {
+  "where": "js:4. memory",
+  "level": "-",
+  "kind": "script",
+  "text": "Nothing is loaded before the session starts.",
+  "id": "C0332"
+ },
+ {
+  "where": "js:4. memory",
+  "level": "-",
+  "kind": "script",
+  "text": "At launch Claude Code walks from the working directory up and loads every CLAUDE.md it finds, plus user and managed files.",
+  "id": "C0333"
+ },
+ {
+  "where": "js:4. memory",
+  "level": "-",
+  "kind": "script",
+  "text": "your private notes for this repo",
+  "id": "C0334"
+ },
+ {
+  "where": "js:4. memory",
+  "level": "-",
+  "kind": "script",
+  "text": "Five sources, all added together. Note what is not loaded yet: the nested CLAUDE.md and the path-scoped rule.",
+  "id": "C0335"
+ },
+ {
+  "where": "js:4. memory",
+  "level": "-",
+  "kind": "script",
+  "text": "Already loaded — it stays in context (after a compaction it loads again the next time Claude reads a file there).",
+  "id": "C0336"
+ },
+ {
+  "where": "js:4. memory",
+  "level": "-",
+  "kind": "script",
+  "text": "loaded lazily: Claude read a file in that folder",
+  "id": "C0337"
+ },
+ {
+  "where": "js:4. memory",
+  "level": "-",
+  "kind": "script",
+  "text": "Nested CLAUDE.md files load on demand, when Claude reads files in their directory. Frontend rules never cost context in a backend-only session.",
+  "id": "C0338"
+ },
+ {
+  "where": "js:4. memory",
+  "level": "-",
+  "kind": "script",
+  "text": "A rule with paths: frontmatter loads only when Claude works with matching files. That keeps CLAUDE.md short.",
+  "id": "C0339"
+ },
+ {
+  "where": "js:4. memory",
+  "level": "-",
+  "kind": "script",
+  "text": "900 lines. Every request now carries them, and important rules drown in noise: Claude starts ignoring some. Fix: prune what Claude already does right, move procedures to skills, scope the rest with .claude/rules/, turn must-haves into hooks.",
+  "id": "C0340"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "Mode set to ……. Now send a call through.",
+  "id": "C0341"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "No rule matched, so the mode decides: manual mode asks for anything beyond reads.",
+  "id": "C0342"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "acceptEdits approves file edits in the working directory.",
+  "id": "C0343"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "acceptEdits also approves common filesystem commands (mkdir touch rm rmdir mv cp sed) inside the working directory. Yes, rm too — know it before you use this mode.",
+  "id": "C0344"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "Plan mode is for research: Claude reads and proposes a plan instead of changing files. Approve the plan to start editing.",
+  "id": "C0345"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "Auto mode: a background classifier reviews the action in context. A build-folder delete inside the project passes; something destructive or off-task would be blocked.",
+  "id": "C0346"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "dontAsk: anything that would prompt is denied. Only reads and pre-approved tools run — perfect for CI.",
+  "id": "C0347"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "⛔ denied — matched deny rule …. Deny is checked first; no mode and no allow rule can override it.",
+  "id": "C0348"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "⛔ denied — the ask rule wants a prompt, and dontAsk turns every prompt into a denial.",
+  "id": "C0349"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "❓ asks you — matched ask rule …. Ask rules prompt even in permissive modes: good for pushes and deploys.",
+  "id": "C0350"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "✅ runs — matched allow rule …, in any mode. This is how you stop being asked about npm test 50 times a day.",
+  "id": "C0351"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "Pick a tool call to send it through the gate.",
+  "id": "C0352"
+ },
+ {
+  "where": "js:5. permissions",
+  "level": "-",
+  "kind": "script",
+  "text": "Shift+Tab → …. (dontAsk is never in the cycle.)",
+  "id": "C0353"
+ },
+ {
+  "where": "js:6. plan race",
+  "level": "-",
+  "kind": "script",
+  "text": "For a one-line fix, planning is pure overhead: 2 vs 6 min. If you can describe the diff in one sentence, skip the plan.",
+  "id": "C0354"
+ },
+ {
+  "where": "js:6. plan race",
+  "level": "-",
+  "kind": "script",
+  "text": "Medium task: roughly a tie. The direct path lost its head start to one rework cycle (a wrong guess about the existing pattern).",
+  "id": "C0355"
+ },
+ {
+  "where": "js:6. plan race",
+  "level": "-",
+  "kind": "script",
+  "text": "15 files: planning wins big. Coding first solved the wrong problem twice; each rework also filled context with dead ends. Plan mode + Ctrl+G to fix the plan cost 16 min and saved 25.",
+  "id": "C0356"
+ },
+ {
+  "where": "js:7. prompt builder",
+  "level": "-",
+  "kind": "script",
+  "text": "Which file? (Claude greps the whole repo)",
+  "id": "C0357"
+ },
+ {
+  "where": "js:7. prompt builder",
+  "level": "-",
+  "kind": "script",
+  "text": "Users are logged out after ~15 min even with “remember me”. Started after commit a1b2c3.",
+  "id": "C0358"
+ },
+ {
+  "where": "js:7. prompt builder",
+  "level": "-",
+  "kind": "script",
+  "text": "Follow the token helpers in @src/auth/tokens.ts.",
+  "id": "C0359"
+ },
+ {
+  "where": "js:7. prompt builder",
+  "level": "-",
+  "kind": "script",
+  "text": "First write a failing test in session.test.ts, then make `pnpm test auth` pass.",
+  "id": "C0360"
+ },
+ {
+  "where": "js:7. prompt builder",
+  "level": "-",
+  "kind": "script",
+  "text": "Don't change the public AuthClient API. No new dependencies.",
+  "id": "C0361"
+ },
+ {
+  "where": "js:7. prompt builder",
+  "level": "-",
+  "kind": "script",
+  "text": "5 guesses. Claude will explore widely, pick a plausible bug, and declare victory without proof.",
+  "id": "C0362"
+ },
+ {
+  "where": "js:7. prompt builder",
+  "level": "-",
+  "kind": "script",
+  "text": "0 guesses. Claude knows where to look, what is wrong, how to do it, what not to touch — and how to prove it's done. Still only 5 lines.",
+  "id": "C0363"
+ },
+ {
+  "where": "js:7. prompt builder",
+  "level": "-",
+  "kind": "script",
+  "text": "… guess… left. Each one is a chance to solve a different problem than yours.",
+  "id": "C0364"
+ },
+ {
+  "where": "js:8. rewind",
+  "level": "-",
+  "kind": "script",
+  "text": "P4 broke the tests. Two ways out: rewind code, or rewind only the conversation.",
+  "id": "C0365"
+ },
+ {
+  "where": "js:8. rewind",
+  "level": "-",
+  "kind": "script",
+  "text": "Rewinding code + conversation to the checkpoint before P2…",
+  "id": "C0366"
+ },
+ {
+  "where": "js:8. rewind",
+  "level": "-",
+  "kind": "script",
+  "text": "utils.ts and posts.ts restored — Claude edited them with its file tools. notes.txt is still gone: it was deleted by a Bash command, and checkpoints don't track Bash. That's what git is for.",
+  "id": "C0367"
+ },
+ {
+  "where": "js:8. rewind",
+  "level": "-",
+  "kind": "script",
+  "text": "Rewinding only the conversation to before P4…",
+  "id": "C0368"
+ },
+ {
+  "where": "js:8. rewind",
+  "level": "-",
+  "kind": "script",
+  "text": "Conversation rewound, code kept. P4 is gone from Claude's memory but utils.ts still has the regex version. Useful when the code is fine and the chat just went off the rails.",
+  "id": "C0369"
+ },
+ {
+  "where": "js:9. skills",
+  "level": "-",
+  "kind": "script",
+  "text": "REST conventions, error format, pagination. Use when adding or changing API endpoints.",
+  "id": "C0370"
+ },
+ {
+  "where": "js:9. skills",
+  "level": "-",
+  "kind": "script",
+  "text": "Build PDF reports with our template. Use for exports.",
+  "id": "C0371"
+ },
+ {
+  "where": "js:9. skills",
+  "level": "-",
+  "kind": "script",
+  "text": "Draft release notes from merged PRs.",
+  "id": "C0372"
+ },
+ {
+  "where": "js:9. skills",
+  "level": "-",
+  "kind": "script",
+  "text": "At start only descriptions load — except for the dashed skill, which Claude can't even see.",
+  "id": "C0373"
+ },
+ {
+  "where": "js:9. skills",
+  "level": "-",
+  "kind": "script",
+  "text": "Your prompt: “add a /invoices endpoint”. Claude matches it against skill descriptions…",
+  "id": "C0374"
+ },
+ {
+  "where": "js:9. skills",
+  "level": "-",
+  "kind": "script",
+  "text": "api-style matched (“Use when adding or changing API endpoints”) and its full body loaded. pdf-report stayed a one-line description. That's why descriptions must say when.",
+  "id": "C0375"
+ },
+ {
+  "where": "js:9. skills",
+  "level": "-",
+  "kind": "script",
+  "text": "/deploy was invisible to Claude (zero context) until you typed it. Anything with side effects should work this way — Claude should never decide to deploy on its own.",
+  "id": "C0376"
+ },
+ {
+  "where": "js:9. skills",
+  "level": "-",
+  "kind": "script",
+  "text": "/release-notes has context: fork: it runs in a forked subagent…",
+  "id": "C0377"
+ },
+ {
+  "where": "js:9. skills",
+  "level": "-",
+  "kind": "script",
+  "text": "The 30K of git log and PR reading stayed in the fork. Your main session got only the finished notes.",
+  "id": "C0378"
+ },
+ {
+  "where": "js:10. subagents",
+  "level": "-",
+  "kind": "script",
+  "text": "Same question, two strategies. Watch where the reading lands.",
+  "id": "C0379"
+ },
+ {
+  "where": "js:10. subagents",
+  "level": "-",
+  "kind": "script",
+  "text": "114K of raw file contents now sit in your main context. The answer is in there somewhere — along with everything Claude read to find it. The rest of the session is slower, pricier and noisier.",
+  "id": "C0380"
+ },
+ {
+  "where": "js:10. subagents",
+  "level": "-",
+  "kind": "script",
+  "text": "Three Explore subagents start in parallel, each with its own fresh context…",
+  "id": "C0381"
+ },
+ {
+  "where": "js:10. subagents",
+  "level": "-",
+  "kind": "script",
+  "text": "+4.5K in main: three short summaries (“payments retries 3× with exponential backoff in retry.ts:42…”). The 114K of reading stayed in the subagents, and they ran at the same time.",
+  "id": "C0382"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "SessionStart → inject “Sprint 42: billing migration, freeze on legacy/”",
+  "id": "C0383"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "PreToolUse Bash → block rm -rf outside the project (exit 2)",
+  "id": "C0384"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "PostToolUse Edit|Write → run prettier on the file",
+  "id": "C0385"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "Stop → desktop notification “Claude is done”",
+  "id": "C0386"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "The turn: Claude edits a file, then tries rm -rf ./build ~/ (oops — a stray ~/).",
+  "id": "C0387"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "🪝 added context: \"Sprint 42: billing migration, freeze on legacy/\"",
+  "id": "C0388"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "▸ UserPromptSubmit: \"rename the build step and clean old output\"",
+  "id": "C0389"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "🪝 block-dangerous.sh → exit 2: \"refusing rm -rf outside the project: ~/\"",
+  "id": "C0390"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "Blocked. Exit code 2 stopped the call, and stderr went back to Claude as the reason.",
+  "id": "C0391"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "⚙ rm -rf ./build ~/ 💥 your home directory is gone (simulated)",
+  "id": "C0392"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "🪝 🔔 notification: \"Claude is done\"",
+  "id": "C0393"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "The guard held. “Never delete outside the project” in CLAUDE.md would probably have worked. The hook always works — and Claude self-corrected from the reason.",
+  "id": "C0394"
+ },
+ {
+  "where": "js:11. hooks",
+  "level": "-",
+  "kind": "script",
+  "text": "No guard, no guarantee. A permission prompt might have saved you — unless you were in a permissive mode and clicked through. Turn the PreToolUse hook back on.",
+  "id": "C0395"
+ },
+ {
+  "where": "js:12. MCP",
+  "level": "-",
+  "kind": "script",
+  "text": ".mcp.json (commit it; teammates approve on first use)\\n{ \"mcpServers\": { \"…\": { \"type\": \"…\", …\"` : `\"command\": \"…\", …`} } } }",
+  "id": "C0396"
+ },
+ {
+  "where": "js:12. MCP",
+  "level": "-",
+  "kind": "script",
+  "text": "~/.claude.json → mcpServers.…\\n(you, every project on this machine)",
+  "id": "C0397"
+ },
+ {
+  "where": "js:12. MCP",
+  "level": "-",
+  "kind": "script",
+  "text": "~/.claude.json → projects[\"/repo\"].mcpServers.…\\n(you, this project only — the default scope)",
+  "id": "C0398"
+ },
+ {
+  "where": "js:12. MCP",
+  "level": "-",
+  "kind": "script",
+  "text": "No servers yet. Claude can only use its built-in tools.",
+  "id": "C0399"
+ },
+ {
+  "where": "js:12. MCP",
+  "level": "-",
+  "kind": "script",
+  "text": "… connected. Only its tool names entered context (… short entries). Full JSON schemas stay deferred until Claude actually uses a tool.",
+  "id": "C0400"
+ },
+ {
+  "where": "js:12. MCP",
+  "level": "-",
+  "kind": "script",
+  "text": "Claude has no way to see GitHub. Best case it asks you to paste the PR list; worst case it guesses. Add the GitHub server first.",
+  "id": "C0401"
+ },
+ {
+  "where": "js:12. MCP",
+  "level": "-",
+  "kind": "script",
+  "text": "Claude picks list_pull_requests — its full schema loads now (tool search)…",
+  "id": "C0402"
+ },
+ {
+  "where": "js:12. MCP",
+  "level": "-",
+  "kind": "script",
+  "text": "“#412, #418 and #421 touch src/billing/” (demo data). Two tools used, two schemas loaded; the other tools still cost only their names. Run /context all to see how many tokens each MCP tool uses.",
+  "id": "C0403"
+ },
+ {
+  "where": "js:12. MCP",
+  "level": "-",
+  "kind": "script",
+  "text": "/plugin install acme-tools@your-org — one package…",
+  "id": "C0404"
+ },
+ {
+  "where": "js:12. MCP",
+  "level": "-",
+  "kind": "script",
+  "text": "…unpacks into a namespaced skill, a subagent, a hook and an MCP server. That is how a team shares one setup across many repos.",
+  "id": "C0405"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Find how retries work in 3 services without flooding my session",
+  "id": "C0406"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Short, independent research questions → subagents. Each reads in its own window and returns a summary. Ask: “use subagents to…”.",
+  "id": "C0407"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Build 3 unrelated features at once without file collisions",
+  "id": "C0408"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Worktrees: claude -w search, claude -w billing… Each session gets its own checkout and branch under .claude/worktrees/, sharing git history.",
+  "id": "C0409"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Start a long refactor, close the terminal, check back later",
+  "id": "C0410"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Background sessions: /background detaches the session; claude agents (agent view) dispatches and monitors them. Step back in by attaching from agent view (or claude attach &lt;id&gt;); claude -r reopens it once it has finished.",
+  "id": "C0411"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "A bug with 3 competing theories — agents should argue and converge",
+  "id": "C0412"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Agent team (experimental): a lead spawns teammates who investigate different hypotheses and message each other to challenge findings.",
+  "id": "C0413"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Migrate 500 files and have a second agent verify each change",
+  "id": "C0414"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Dynamic workflow: Claude writes a script that fans out subagents and cross-checks results; you can re-run it. For a big mechanical change, the bundled /batch skill splits it across subagents in their own worktrees.",
+  "id": "C0415"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Keep working until every test in the module passes",
+  "id": "C0416"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "/goal “all tests in src/billing pass”: after each turn a small model checks the condition; if not met, Claude takes another turn.",
+  "id": "C0417"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Check the deploy status every 5 minutes while I work",
+  "id": "C0418"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "/loop 5m check the deploy and tell me if it fails. Session-scoped: stops when the session ends.",
+  "id": "C0419"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Triage new issues every night, even with my laptop closed",
+  "id": "C0420"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Routine via /schedule: runs in the cloud on a cron, an API call or GitHub events. No open terminal needed.",
+  "id": "C0421"
+ },
+ {
+  "where": "js:13. parallel chooser",
+  "level": "-",
+  "kind": "script",
+  "text": "Each scenario lights up the approach that fits best.",
+  "id": "C0422"
+ },
+ {
+  "where": "js:14. CI",
+  "level": "-",
+  "kind": "script",
+  "text": "1 · Event — PR #57 “Add proration to invoices” opened",
+  "id": "C0423"
+ },
+ {
+  "where": "js:14. CI",
+  "level": "-",
+  "kind": "script",
+  "text": "2 · .github/workflows/claude-review.yml- uses: anthropics/claude-code-action@v1 with: anthropic_api_key: \\…} prompt: \"Review this PR for bugs. Run the billing tests.\" claude_args: --permission-mode dontAsk…",
+  "id": "C0424"
+ },
+ {
+  "where": "js:14. CI",
+  "level": "-",
+  "kind": "script",
+  "text": "A pull request triggers the workflow…",
+  "id": "C0425"
+ },
+ {
+  "where": "js:14. CI",
+  "level": "-",
+  "kind": "script",
+  "text": "dontAsk mode + an exact allowlist: nothing can prompt (there is no human in CI), so anything not listed that would need approval is denied; reads and read-only commands still run.",
+  "id": "C0426"
+ },
+ {
+  "where": "js:14. CI",
+  "level": "-",
+  "kind": "script",
+  "text": "dontAsk mode, but somebody deleted the allowlist…",
+  "id": "C0427"
+ },
+ {
+  "where": "js:14. CI",
+  "level": "-",
+  "kind": "script",
+  "text": "{ \"type\": \"result\", \"subtype\": \"success\",\\n \"result\": \"1 bug: proration rounds per line, not per invoice (invoice.ts:88). Test added; 1 failing.\",\\n \"total_cost_usd\": 0.41, \"session_id\": \"…\" }\\n→ written to the workflow run log (add a comment tool to post it on the PR)",
+  "id": "C0428"
+ },
+ {
+  "where": "js:14. CI",
+  "level": "-",
+  "kind": "script",
+  "text": "{ \"type\": \"result\", \"subtype\": \"success\",\\n \"result\": \"Code looks correct (tests could not be run).\",\\n \"total_cost_usd\": 0.19, \"session_id\": \"…\" }\\n→ written to the workflow run log 😬",
+  "id": "C0429"
+ },
+ {
+  "where": "js:14. CI",
+  "level": "-",
+  "kind": "script",
+  "text": "Useful review. Claude could read and run exactly the tests it needed; the suspicious curl (maybe from prompt injection in a PR comment) was denied. Least privilege, no prompts.",
+  "id": "C0430"
+ },
+ {
+  "where": "js:14. CI",
+  "level": "-",
+  "kind": "script",
+  "text": "Green but worthless. In dontAsk, reads still work, so the job “succeeds” — but tests never ran and the bug slipped through. A CI review is only as good as the tools you allow.",
+  "id": "C0431"
+ },
+ {
+  "where": "js:14. CI",
+  "level": "-",
+  "kind": "script",
+  "text": "The job runs in dontAsk mode: reads plus pre-approved tools only.",
+  "id": "C0432"
+ },
+ {
+  "where": "js:15. model & effort",
+  "level": "-",
+  "kind": "script",
+  "text": "Mechanical change with a clear finish line. Low effort is fast and cheap; even haiku works for many such tasks.",
+  "id": "C0433"
+ },
+ {
+  "where": "js:15. model & effort",
+  "level": "-",
+  "kind": "script",
+  "text": "The plan already holds the hard thinking. A solid mid-size model at default effort executes it well — this is where opusplan shines.",
+  "id": "C0434"
+ },
+ {
+  "where": "js:15. model & effort",
+  "level": "-",
+  "kind": "script",
+  "text": "Subtle bugs reward deeper reasoning: more hypotheses considered, fewer wrong fixes. Raise effort for this session, lower it afterwards.",
+  "id": "C0435"
+ },
+ {
+  "where": "js:15. model & effort",
+  "level": "-",
+  "kind": "script",
+  "text": "opus or fable · /effort xhigh · plan mode",
+  "id": "C0436"
+ },
+ {
+  "where": "js:15. model & effort",
+  "level": "-",
+  "kind": "script",
+  "text": "Design and hard refactors are where top models and high effort earn their price. Use plan mode so the thinking produces a reviewable plan. max can overthink — test before adopting it.",
+  "id": "C0437"
+ },
+ {
+  "where": "js:15. model & effort",
+  "level": "-",
+  "kind": "script",
+  "text": "Fast mode: same Opus model, up to ~2.5× faster output, higher cost per token — for when you're waiting on it interactively.",
+  "id": "C0438"
+ },
+ {
+  "where": "js:15. model & effort",
+  "level": "-",
+  "kind": "script",
+  "text": "Fast mode only runs on Opus — turning it on switches you from Sonnet to Opus — so it isn't part of this Sonnet pick.",
+  "id": "C0439"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "I run claude inside a repo and ask it questions",
+  "id": "C0440"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "I interrupt with Esc and redirect early",
+  "id": "C0441"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "I use plan mode for multi-file changes",
+  "id": "C0442"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "I always give Claude a test or command to verify",
+  "id": "C0443"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "I /clear between unrelated tasks",
+  "id": "C0444"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "I have allow/ask/deny permission rules",
+  "id": "C0445"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "My repeated playbooks are skills",
+  "id": "C0446"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "I delegate heavy research to subagents",
+  "id": "C0447"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "I connected MCP servers I use daily",
+  "id": "C0448"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "I run parallel sessions in worktrees",
+  "id": "C0449"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "I use /goal, routines or workflows for long jobs",
+  "id": "C0450"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "🎓 All rungs. Now teach it: /team-onboarding drafts an onboarding guide from your usage history.",
+  "id": "C0451"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "One task, then an unrelated question, then back. Context full of irrelevant stuff. Fix: /clear between unrelated tasks; /btw for quick lookups.",
+  "id": "C0452"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "Wrong, corrected, still wrong, corrected again — context polluted with failed approaches. Fix: after two failed corrections, /clear and write a better first prompt with what you learned (or rewind).",
+  "id": "C0453"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "So long that important rules get lost in the noise. Fix: prune ruthlessly; if Claude already does it right without the line, delete it or make it a hook.",
+  "id": "C0454"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "Plausible code that misses edge cases. Fix: always provide verification — tests, scripts, screenshots. If you can't verify it, don't ship it.",
+  "id": "C0455"
+ },
+ {
+  "where": "js:16. expert ladder + clinic",
+  "level": "-",
+  "kind": "script",
+  "text": "“Investigate X” with no scope; Claude reads hundreds of files. Fix: scope narrowly, or send the investigation to subagents.",
+  "id": "C0456"
+ }
+]
