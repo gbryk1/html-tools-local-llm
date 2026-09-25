@@ -31,6 +31,13 @@ Dane użytkownika nigdy nie opuszczają urządzenia.
 Bajty modelu są mapowane po nazwie pliku plus aliasy (`encoder_model*.onnx` → wersja `q8`,
 `model*.onnx` → wersja `q4f16`), więc kwantyzacja jest wybierana przez `dtype` w kodzie strony.
 
+## Skille
+
+- [`skills/animated-knowledge-page`](skills/animated-knowledge-page/SKILL.md) — metoda budowy animowanych,
+  scrollytellingowych stron wiedzy w stylu „Head First” (jak `cassandra-course.html`): plan rozdziałów, boxy,
+  diagramy SVG/Canvas uruchamiane przez IntersectionObserver, quiz, ściąga, test headless
+  ([`scripts/check-page.cjs`](skills/animated-knowledge-page/scripts/check-page.cjs)) i znane pułapki.
+
 ## Przebudowa
 
 ```bash
