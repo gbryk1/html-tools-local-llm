@@ -152,6 +152,10 @@ Don't use subagents for:
 
 - **Stale facts about fast-moving tools.** The draft said `acceptEdits` auto-approves only `mkdir/touch/mv/cp`, but the docs say
   `rm`, `rmdir` and `sed` too. Verify behavior, not only numbers, and have the verifier re-find the evidence itself.
+- **Docs-only checking misses runtime constraints.** A `--json-schema` example with an array root passed doc review but
+  failed when run (`API Error: 400 … input_schema.type: Input should be 'object'`). Verifiers run cheap, safe snippets.
+- **Fix rounds introduce new errors.** Each round of fixes produced new imprecisions (3 rounds on the Claude Code guide).
+  Loop re-verification on changed claims until a round comes back clean.
 - **Self-verification bias.** Re-reading your own notes confirms your own mistakes. Pass 2 must start from the page text and the sources.
 - **Claims hide in JS.** Status narrations and scenario texts appear only after clicks. `extract-claims.cjs` reads the
   script's string literals, attributed to the nearest `/* ---------- N. name ---------- */` comment. Keep that

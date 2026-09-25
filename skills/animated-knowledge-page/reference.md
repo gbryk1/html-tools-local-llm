@@ -211,6 +211,14 @@ folder. It doesn't get the author's pass-1 text: strip those lines first, or tel
 > (✅ ⚠️ ❌ ❓ n/a), the evidence location and a short quote. For ⚠️ or ❌, write the corrected wording. Treat every cell of
 > a table row, every flag in a code block, and every number as part of the claim. Mark n/a only for pedagogy, opinion
 > or numbers the page labels illustrative. Return a summary: counts per verdict and the list of non-✅ IDs with fixes.
+> Where a snippet is cheap and safe to run (a CLI flag combination, a glob, a shell loop, a JSON schema), run it in a
+> throwaway folder and cite the observed output — docs examples can hide constraints (e.g. a schema root that must be
+> an object) that only execution reveals. Never run anything that edits files outside that folder or spends real money
+> beyond a tiny prompt.
+
+**Disputes.** Verifiers can be wrong too (one flagged `/context all` as undocumented; a doc page said the opposite).
+Overrule a verdict only with a quote from a source, record it on the claim's `pass 2` line (`✅ (author override) <file> — "<quote>"`),
+and prefer sending the dispute to a fresh verifier over deciding it yourself.
 
 **Resolve.** Apply the fixes to the page and re-extract. The IDs of unchanged claims may shift, so match on text.
 Carry verdicts over for text that didn't change, and send only new or changed claims to a new verifier. The ship gate:

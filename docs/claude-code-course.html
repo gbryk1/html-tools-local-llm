@@ -483,7 +483,7 @@ footer { max-width:800px; margin:0 auto; padding:2rem 1.2rem 4rem; font:14px var
       <div class="q">Q:</div><div>Why did it read files before editing? I told it which test fails.</div>
       <div class="a">A:</div><div>Because the model starts every session knowing nothing about your code. It has no index
         of your repo in its head. Everything it knows comes from what it read in <em>this</em> session, plus
-        <code>CLAUDE.md</code> (chapter 4). Reading first is the correct behavior — you can make it faster by pointing
+        <code>CLAUDE.md</code> and auto memory (chapter 4). Reading first is the correct behavior — you can make it faster by pointing
         at files with <code>@path</code>.</div>
       <div class="q">Q:</div><div>Can I type while it works?</div>
       <div class="a">A:</div><div>Yes. Messages you type during a turn are queued and read by Claude at the next step.
@@ -494,7 +494,7 @@ footer { max-width:800px; margin:0 auto; padding:2rem 1.2rem 4rem; font:14px var
   <div class="box bullets reveal"><span class="lbl">📌 Bullet points</span>
     <ul>
       <li>Claude Code = model + tools + a loop: gather context → act → verify → repeat.</li>
-      <li>It knows nothing about your repo at start; reading is not wasted time.</li>
+      <li>Apart from CLAUDE.md and auto memory, it knows nothing about your repo at start; reading is not wasted time.</li>
       <li>Give it a way to verify (tests, build, screenshots). No verification ⇒ plausible-looking bugs.</li>
       <li><kbd>Esc</kbd> interrupts, typing mid-turn queues a correction. Steer early.</li>
     </ul>
@@ -519,7 +519,7 @@ claude -r         # pick an older session to resume</code></pre>
 
   <p class="reveal">The same engine runs in several <b>surfaces</b>: the terminal CLI, VS Code and JetBrains extensions,
   the Desktop app, the web at <code>claude.ai/code</code> (cloud sessions in a sandbox), the mobile app, and Slack. They
-  share settings, <code>CLAUDE.md</code>, and skills. You can move a session between them: <code>/desktop</code> hands a
+  share your repo's <code>CLAUDE.md</code> files, settings and MCP servers. With a claude.ai subscription you can move a session between them: <code>/desktop</code> hands a
   terminal session to the Desktop app, <code>--teleport</code> pulls a cloud session into your terminal, and
   <code>/remote-control</code> lets you steer a local session from your phone.</p>
 
@@ -747,7 +747,7 @@ claude -r         # pick an older session to resume</code></pre>
       <tr><td><code>acceptEdits</code></td><td>Reads, file edits, and common filesystem commands (<code>mkdir</code>, <code>touch</code>, <code>rm</code>, <code>rmdir</code>, <code>mv</code>, <code>cp</code>, <code>sed</code>) inside the working directories</td><td>Iterating on code you review in git</td></tr>
       <tr><td><code>plan</code></td><td>Reads (research only, no edits)</td><td>Exploring and designing before changing</td></tr>
       <tr><td><code>auto</code></td><td>Everything, with a background safety classifier</td><td>Long tasks, less prompt fatigue</td></tr>
-      <tr><td><code>dontAsk</code></td><td>Only pre-approved tools; anything else is denied</td><td>Locked-down CI and scripts</td></tr>
+      <tr><td><code>dontAsk</code></td><td>Reads and pre-approved tools; anything that would prompt is denied</td><td>Locked-down CI and scripts</td></tr>
       <tr><td><code>bypassPermissions</code></td><td>Everything, no checks</td><td>Isolated containers / VMs only</td></tr>
     </tbody>
   </table>
@@ -768,7 +768,7 @@ claude -r         # pick an older session to resume</code></pre>
     <div class="rules" id="perm-rules"></div>
     <div class="calls" id="perm-calls"></div>
     <div class="status" id="perm-status">Pick a tool call to send it through the gate.</div>
-    <figcaption>Simplified: the real <code>auto</code> classifier looks at the whole conversation, and writes to protected
+    <figcaption>Simplified: the real <code>auto</code> classifier sees your messages and Claude's actions (not tool output), and writes to protected
       paths (like <code>.git</code>) have their own rules. Rule syntax is real — try it in <code>/permissions</code>.</figcaption>
   </figure>
 
@@ -781,7 +781,7 @@ claude -r         # pick an older session to resume</code></pre>
   }
 }</code></pre>
 
-  <p class="reveal">Settings come in layers too, but unlike CLAUDE.md they <b>override</b>: managed policy &gt; command-line
+  <p class="reveal">Settings come in layers too. For a single key the <b>higher layer wins</b> — but list keys such as <code>permissions.allow</code> and <code>deny</code> are <b>merged</b> across layers: managed policy &gt; command-line
   flags (<code>--settings</code>) &gt; <code>.claude/settings.local.json</code> (you, this project) &gt;
   <code>.claude/settings.json</code> (team) &gt; <code>~/.claude/settings.json</code> (you, everywhere). Not sure
   where a key belongs? Ask: <code>/update-config allow npm test</code> — or run <code>/fewer-permission-prompts</code>,
@@ -1090,8 +1090,8 @@ context: fork                       # run in a forked subagent, return a summary
     </div>
     <div class="sub-grid" id="sub-grid"></div>
     <div class="status" id="sub-status">Same question, two strategies. Watch where the reading lands.</div>
-    <figcaption>Token counts are illustrative. Subagents have their own token cost — delegation saves your main
-      context, not money. Parallel subagents finish sooner than sequential reading.</figcaption>
+    <figcaption>Token counts are illustrative. Subagents spend their own tokens — delegation mainly protects your main
+      context (a cheaper subagent model, e.g. Haiku, can also cut cost). Parallel subagents finish sooner than sequential reading.</figcaption>
   </figure>
 
 <pre class="reveal"><code>.claude/agents/security-reviewer.md
@@ -1147,8 +1147,8 @@ the exploit scenario, and the minimal fix. No style comments.</code></pre>
 
   <p class="reveal">Everything so far is advice the model <em>interprets</em>. A <b>hook</b> is different: Claude Code
   itself runs your shell command (or HTTP call, MCP tool, prompt, or subagent) when a lifecycle event fires. It
-  always runs. It can block actions, inject context, or just log. Configure hooks in <code>settings.json</code> or via
-  <code>/hooks</code>.</p>
+  always runs. It can block actions, inject context, or just log. Configure hooks in <code>settings.json</code>;
+  <code>/hooks</code> lets you browse them (read-only).</p>
 
 <pre class="reveal"><code>{
   "hooks": {
@@ -1186,7 +1186,7 @@ the exploit scenario, and the minimal fix. No style comments.</code></pre>
       <tr><td><code>UserPromptSubmit</code></td><td>Add context or reject prompts (e.g. leaked secrets)</td></tr>
       <tr><td><code>PreToolUse</code></td><td>Block dangerous commands, protect files, enforce rules</td></tr>
       <tr><td><code>PermissionRequest</code></td><td>Auto-approve or deny a permission prompt by policy</td></tr>
-      <tr><td><code>PostToolUse</code></td><td>Format, lint, typecheck after edits — output lands in context</td></tr>
+      <tr><td><code>PostToolUse</code></td><td>Format, lint, typecheck after edits — exit 2 (stderr) or JSON <code>additionalContext</code> feeds problems back to Claude</td></tr>
       <tr><td><code>Stop</code></td><td>Run tests before Claude may finish; notify you</td></tr>
       <tr><td><code>Notification</code></td><td>Desktop / phone ping when Claude waits for input</td></tr>
       <tr><td><code>PreCompact</code></td><td>Save a transcript backup before compaction</td></tr>
@@ -1205,7 +1205,7 @@ the exploit scenario, and the minimal fix. No style comments.</code></pre>
   <div class="box bullets reveal"><span class="lbl">📌 Bullet points</span>
     <ul>
       <li>Hook = deterministic code on a lifecycle event. CLAUDE.md = a request; hook = a guarantee.</li>
-      <li>Exit 2 blocks (<code>PreToolUse</code>); stdout/stderr can feed Claude context.</li>
+      <li>Exit 2 blocks (<code>PreToolUse</code>) and stderr becomes Claude's feedback; JSON output can add context. Plain stdout of most events goes only to the debug log.</li>
       <li>Best starter hooks: format after edit, block dangerous Bash, notify when waiting.</li>
     </ul>
   </div>
@@ -1222,7 +1222,7 @@ the exploit scenario, and the minimal fix. No style comments.</code></pre>
 <pre class="reveal"><code># remote HTTP server (OAuth in /mcp)
 claude mcp add --transport http notion https://mcp.notion.com/mcp
 # local stdio server: everything after -- is the server command
-claude mcp add --transport stdio db --env DB_URL=postgres://… -- npx -y @bytebase/dbhub
+claude mcp add --transport stdio db -- npx -y @bytebase/dbhub --dsn "postgresql://readonly:…@localhost:5432/app"
 # share with the team via .mcp.json
 claude mcp add --scope project --transport http sentry https://mcp.sentry.dev/mcp</code></pre>
 
@@ -1253,7 +1253,7 @@ claude mcp add --scope project --transport http sentry https://mcp.sentry.dev/mc
     </div>
     <div class="status" id="mcp-status">No servers yet. Claude can only use its built-in tools.</div>
     <figcaption>Tool search is on by default: only tool names load at start; a full schema loads when Claude needs that
-      tool. <code>/mcp</code> shows status and handles OAuth; <code>/context all</code> shows per-tool token cost.</figcaption>
+      tool. <code>/mcp</code> shows status and handles OAuth; <code>/context all</code> shows how many tokens each loaded MCP tool uses.</figcaption>
   </figure>
 
   <p class="reveal">MCP scopes override by name: <b>local &gt; project &gt; user</b>. Local and user servers are stored in
@@ -1300,7 +1300,7 @@ claude mcp add --scope project --transport http sentry https://mcp.sentry.dev/mc
     <div class="appr" id="par-appr"></div>
     <div class="status" id="par-status">Each scenario lights up the approach that fits best.</div>
     <figcaption>Availability varies: agent teams are experimental (<code>CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1</code>),
-      routines and agent view are in research preview, dynamic workflows need a paid plan.</figcaption>
+      routines and agent view are in research preview, dynamic workflows need a paid plan or API / cloud-provider access (on Pro, switch them on in <code>/config</code>).</figcaption>
   </figure>
 
   <div class="scroll-x reveal">
@@ -1311,7 +1311,8 @@ claude mcp add --scope project --transport http sentry https://mcp.sentry.dev/mc
       <tr><td>Worktrees</td><td><code>claude -w feature-auth</code> — own checkout under <code>.claude/worktrees/</code></td><td>You, one session each</td></tr>
       <tr><td>Background sessions</td><td><code>/background</code>, <code>claude agents</code> (agent view), <kbd>Ctrl+B</kbd> for tasks</td><td>You dispatch, check back later</td></tr>
       <tr><td>Agent teams</td><td>Lead + teammates with a shared task list and messaging</td><td>The lead agent</td></tr>
-      <tr><td>Dynamic workflows</td><td>Ask for “a workflow”; <code>/batch</code> for big parallel changes</td><td>A script Claude writes</td></tr>
+      <tr><td>Dynamic workflows</td><td>Ask for “a workflow”</td><td>A script Claude writes</td></tr>
+      <tr><td><code>/batch</code></td><td>Bundled skill: splits a big change across subagents in their own worktrees</td><td>Claude, following the skill</td></tr>
       <tr><td><code>/goal</code></td><td>“until all tests pass” — keeps taking turns until a checker says done</td><td>A completion condition</td></tr>
       <tr><td><code>/loop</code></td><td><code>/loop 5m check the deploy</code> — repeats while the session is open</td><td>A timer</td></tr>
       <tr><td>Routines</td><td><code>/schedule</code> — cloud runs on cron, API or GitHub events, laptop closed</td><td>A trigger</td></tr>
@@ -1336,7 +1337,7 @@ claude mcp add --scope project --transport http sentry https://mcp.sentry.dev/mc
 
   <div class="box bullets reveal"><span class="lbl">📌 Bullet points</span>
     <ul>
-      <li>Side quest → subagent. Separate features → worktrees. Debate → agent team. Huge fan-out → workflow / <code>/batch</code>.</li>
+      <li>Side quest → subagent. Separate features → worktrees. Debate → agent team. Huge cross-checked fan-out → workflow; big mechanical change → <code>/batch</code>.</li>
       <li>Keep going until done → <code>/goal</code>. Poll → <code>/loop</code>. Laptop closed → routine via <code>/schedule</code>.</li>
     </ul>
   </div>
@@ -1352,18 +1353,20 @@ claude mcp add --scope project --transport http sentry https://mcp.sentry.dev/mc
 <pre class="reveal"><code># one-off, pipe in, JSON out
 git diff main | claude -p "review for bugs; reply as a list" --output-format json
 
-# structured output validated against a schema
-claude -p "list TODOs as JSON" --json-schema '{"type":"array","items":{"type":"string"}}'
+# structured output validated against a schema (the root must be an object)
+claude -p "list TODOs" --output-format json \
+  --json-schema '{"type":"object","properties":{"todos":{"type":"array","items":{"type":"string"}}},"required":["todos"]}' \
+  | jq '.structured_output'
 
-# locked down for CI: only listed tools, everything else denied
+# locked down for CI: listed tools + reads / read-only commands; anything that would prompt is denied
 claude -p "run the tests and fix failures" \
   --permission-mode dontAsk --allowedTools "Read" "Edit" "Bash(npm test *)" \
   --max-turns 20 --max-budget-usd 5
 
 # fan out over files
-for f in $(git ls-files 'src/**/*.js'); do
-  claude -p "migrate $f from CommonJS to ESM, keep behavior" --allowedTools "Read" "Edit"
-done</code></pre>
+git ls-files -z 'src/*.js' | while IFS= read -r -d '' f; do   # git's * also matches across /
+  claude -p "migrate $f from CommonJS to ESM, keep behavior" --allowedTools "Read" "Edit" </dev/null
+done                     # </dev/null: otherwise claude -p eats the rest of the file list from stdin</code></pre>
 
   <figure class="fig wide" id="fig-ci">
     <div class="ftitle">▶ A PR review job <span>GitHub Actions + claude -p</span></div>
@@ -1373,9 +1376,12 @@ done</code></pre>
       <button class="btn" data-act="reset">↺ Reset</button>
     </div>
     <div class="ci" id="ci-box"></div>
-    <div class="status" id="ci-status">The job runs in dontAsk mode: pre-approved tools only.</div>
-    <figcaption>Based on <code>anthropics/claude-code-action@v1</code>. Run <code>/install-github-app</code> once to set
-      up the app and secret; then <code>@claude</code> in an issue or PR comment triggers it too.</figcaption>
+    <div class="status" id="ci-status">The job runs in dontAsk mode: reads plus pre-approved tools only.</div>
+    <figcaption>Based on <code>anthropics/claude-code-action@v1</code>. Run <code>/install-github-app</code> once: it installs
+      the app, adds the secret and pushes a branch with the workflow files, opening a ready-to-create PR in your browser;
+      after you create and merge it, <code>@claude</code> in an issue or PR
+      comment triggers Claude too. A workflow with a <code>prompt</code> runs in automation mode and writes results to the
+      run log unless the prompt tells Claude to post and it has a tool that can comment.</figcaption>
   </figure>
 
   <div class="box geek reveal"><span class="lbl">🤓 Deep dive</span>
@@ -1402,7 +1408,7 @@ done</code></pre>
   <p class="reveal">Two dials decide how hard Claude thinks. The <b>model</b> (<code>/model</code>, <code>--model</code>,
   <kbd>Option/Alt+P</kbd>) picks the brain; the <b>effort level</b> (<code>/effort</code>, <code>--effort</code>) picks how
   much it reasons per step: <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code>.
-  Aliases always point to the latest version: <code>haiku</code>, <code>sonnet</code>, <code>opus</code>,
+  Aliases track the recommended version for your provider: <code>haiku</code>, <code>sonnet</code>, <code>opus</code>,
   <code>fable</code>, <code>best</code>; plus <code>opusplan</code> (Opus to plan, Sonnet to execute) and
   <code>[1m]</code> variants for a 1M-token window.</p>
 
@@ -1435,9 +1441,9 @@ done</code></pre>
       <div class="a">A:</div><div><code>/usage</code> (alias <code>/cost</code>) shows session cost and plan limits;
         <code>/context</code> shows what fills the window; a custom status line (<code>/statusline</code>) can show
         model, context % and cost all the time.</div>
-      <div class="q">Q:</div><div>Biggest cost lever?</div>
-      <div class="a">A:</div><div>Context, not the model. Clearing between tasks, lean CLAUDE.md, subagents for heavy
-        reading and fewer idle MCP servers save more than switching models. Then pick the smallest model and effort that
+      <div class="q">Q:</div><div>Which cost levers matter?</div>
+      <div class="a">A:</div><div>Context matters as much as the model: token costs scale with context size, so clearing
+        between tasks, lean CLAUDE.md, subagents for heavy reading and fewer idle MCP servers all cut spend. Then pick the smallest model and effort that
         do the job, and raise them for the hard parts.</div>
     </div>
   </div>
@@ -1446,7 +1452,7 @@ done</code></pre>
     <ul>
       <li>Model = which brain; effort = how long it thinks. Raise both for design and hard debugging only.</li>
       <li><code>opusplan</code>: strong planning, cheaper execution. Subagents can use <code>model: haiku</code> for search.</li>
-      <li>Watch <code>/usage</code> and <code>/context</code>; context hygiene is the biggest saving.</li>
+      <li>Watch <code>/usage</code> and <code>/context</code>; context hygiene is one of the biggest savings.</li>
     </ul>
   </div>
 </section>
@@ -1758,7 +1764,7 @@ function say(el, html, cls = '') { el.className = 'status' + (cls ? ' ' + cls : 
     const my = ++run;
     reset(); run = my;
     user('the login test fails — fix it');
-    say(st, '<b>Gather:</b> Claude knows nothing about the repo yet, so it searches and reads first.');
+    say(st, '<b>Gather:</b> beyond CLAUDE.md and auto memory, Claude knows nothing about this code yet, so it searches and reads first.');
     if (!await step(my, 'gather', 'Grep("login", src/)', '3 matches in src/auth/')) return;
     if (!await step(my, 'gather', 'Read(src/auth/login.test.ts)', 'expects session valid until expiry')) return;
     if (!await step(my, 'gather', 'Read(src/auth/session.ts)', 'isValid() uses now < expiresAt')) return;
@@ -1857,7 +1863,7 @@ function say(el, html, cls = '') { el.className = 'status' + (cls ? ' ' + cls : 
     async tab(my) {
       mode = (mode + 1) % MODES.length; modeEl.textContent = MODES[mode];
       modeEl.animate([{ transform: 'scale(1.25)' }, { transform: 'none' }], { duration: 400 });
-      const why = ['Manual: Claude asks before edits and commands.', 'Accept edits: file edits and common fs commands run without asking.', 'Plan mode: research only, no edits — Claude proposes a plan.', 'Auto mode: everything runs, a background classifier blocks risky actions. It appears in the cycle when enabled for your plan.'];
+      const why = ['Manual: Claude asks before edits and commands.', 'Accept edits: file edits and common fs commands run without asking.', 'Plan mode: research only, no edits — Claude proposes a plan.', 'Auto mode: a classifier model reviews actions instead of you and blocks risky ones. It appears in the cycle when auto mode is available (supported model, not turned off by your org); on Pro, Max and Team it is the default starting mode.'];
       say(st, `<kbd>Shift+Tab</kbd> → <b>${MODES[mode]}</b>. ${why[mode]}`);
     },
     async btw(my) {
@@ -1916,7 +1922,7 @@ function say(el, html, cls = '') { el.className = 'status' + (cls ? ' ' + cls : 
     say(st, msg, cls);
   }
   const acts = {
-    read() { add('work', 45000, '<b>+45K</b>: three big files. Useful, but big. Reading a whole file when you needed one function is the most common context leak — point to it with <code>@file</code> or ask for a section.'); },
+    read() { add('work', 45000, '<b>+45K</b>: three big files. Useful, but big. File reads dominate context usage — name the exact file and function so Claude reads less (note: <code>@file</code> pulls in the whole file).'); },
     tangent() { add('noise', 14000, '<b>+14K of noise</b>: an unrelated question and its answer. It stays in context and competes with your real task for attention. New topic → <code>/clear</code> or <code>/btw</code>.', 'warn'); },
     async sub() {
       say(st, 'A subagent does the searching in <em>its own</em> window…');
@@ -1989,7 +1995,7 @@ function say(el, html, cls = '') { el.className = 'status' + (cls ? ' ' + cls : 
   async function touch(my, fileId, memId, label, why, msg) {
     await start(my); if (my !== run) return;
     el[fileId].classList.add('touch'); await sleep(450);
-    if (el[memId].classList.contains('on')) { say(st, 'Already loaded — lazy files load once per session.'); return; }
+    if (el[memId].classList.contains('on')) { say(st, 'Already loaded — it stays in context (after a compaction it loads again the next time Claude reads a file there).'); return; }
     if (!await load(my, memId, label, why)) return;
     say(st, msg, 'ok');
   }
@@ -2366,7 +2372,7 @@ function say(el, html, cls = '') { el.className = 'status' + (cls ? ' ' + cls : 
     if (!await fire(my, 2)) return; L('▸ PreToolUse Edit(build.config.ts) — no Bash matcher, passes');
     if (!await fire(my, 3)) return; L('  ⚙ Edit applied');
     if (!await fire(my, 4)) return;
-    L('▸ PostToolUse Edit'); if (cb.fmt.checked) L('  🪝 prettier --write build.config.ts → formatted (output fed back to Claude)', 'g');
+    L('▸ PostToolUse Edit'); if (cb.fmt.checked) L('  🪝 prettier --write build.config.ts → formatted', 'g');
     // tool call 2: bash rm
     if (!await fire(my, 2, 500)) return; L('▸ PreToolUse Bash(rm -rf ./build ~/)');
     if (cb.guard.checked) {
@@ -2443,7 +2449,7 @@ function say(el, html, cls = '') { el.className = 'status' + (cls ? ' ' + cls : 
     await flyDot(svg, s.x, s.y, CX, CY, { ms: 400 }); if (my !== run) return;
     state.on.gh.tools.get_pull_request_files.classList.add('full');
     for (let i = 0; i < 3; i++) { await flyDot(svg, CX, CY, s.x, s.y, { ms: 250, color: C.accent2, r: 4 }); if (my !== run) return; }
-    say(st, '<b>“#412, #418 and #421 touch src/billing/”</b> (demo data). Two tools used, two schemas loaded; the other tools still cost only their names. Run <code>/context all</code> to see per-tool cost.', 'ok');
+    say(st, '<b>“#412, #418 and #421 touch src/billing/”</b> (demo data). Two tools used, two schemas loaded; the other tools still cost only their names. Run <code>/context all</code> to see how many tokens each MCP tool uses.', 'ok');
   }
   async function plugin() {
     const my = ++run;
@@ -2484,9 +2490,9 @@ function say(el, html, cls = '') { el.className = 'status' + (cls ? ' ' + cls : 
   const SC = [
     ['Find how retries work in 3 services without flooding my session', 'subagent', 'Short, independent research questions → <b>subagents</b>. Each reads in its own window and returns a summary. Ask: “use subagents to…”.'],
     ['Build 3 unrelated features at once without file collisions', 'worktree', '<b>Worktrees</b>: <code>claude -w search</code>, <code>claude -w billing</code>… Each session gets its own checkout and branch under <code>.claude/worktrees/</code>, sharing git history.'],
-    ['Start a long refactor, close the terminal, check back later', 'background', '<b>Background sessions</b>: <code>/background</code> detaches the session; <code>claude agents</code> (agent view) dispatches and monitors them. Resume with <code>claude -r</code>.'],
+    ['Start a long refactor, close the terminal, check back later', 'background', '<b>Background sessions</b>: <code>/background</code> detaches the session; <code>claude agents</code> (agent view) dispatches and monitors them. Step back in by attaching from agent view (or <code>claude attach &lt;id&gt;</code>); <code>claude -r</code> reopens it once it has finished.'],
     ['A bug with 3 competing theories — agents should argue and converge', 'team', '<b>Agent team</b> (experimental): a lead spawns teammates who investigate different hypotheses and message each other to challenge findings.'],
-    ['Migrate 500 files and have a second agent verify each change', 'workflow', '<b>Dynamic workflow</b>: Claude writes a script that fans out subagents and cross-checks results; you can re-run it. For a big parallel code change, <code>/batch</code> is the bundled shortcut.'],
+    ['Migrate 500 files and have a second agent verify each change', 'workflow', '<b>Dynamic workflow</b>: Claude writes a script that fans out subagents and cross-checks results; you can re-run it. For a big mechanical change, the bundled <code>/batch</code> skill splits it across subagents in their own worktrees.'],
     ['Keep working until every test in the module passes', 'goal', '<b>/goal</b> “all tests in src/billing pass”: after each turn a small model checks the condition; if not met, Claude takes another turn.'],
     ['Check the deploy status every 5 minutes while I work', 'loop', '<b>/loop 5m check the deploy and tell me if it fails</b>. Session-scoped: stops when the session ends.'],
     ['Triage new issues every night, even with my laptop closed', 'routine', '<b>Routine</b> via <code>/schedule</code>: runs in the cloud on a cron, an API call or GitHub events. No open terminal needed.']
@@ -2530,7 +2536,7 @@ function say(el, html, cls = '') { el.className = 'status' + (cls ? ' ' + cls : 
     const [s1, s2, s3, s4] = build(allow);
     const act = s => { [s1, s2, s3, s4].forEach(x => x.classList.remove('act')); s.classList.add('act'); };
     act(s1); say(st, 'A pull request triggers the workflow…'); await sleep(700); if (my !== run) return;
-    act(s2); say(st, allow ? 'dontAsk mode + an exact allowlist: nothing can prompt (there is no human in CI), so everything not listed is denied.' : 'dontAsk mode, but somebody deleted the allowlist…', allow ? '' : 'warn');
+    act(s2); say(st, allow ? 'dontAsk mode + an exact allowlist: nothing can prompt (there is no human in CI), so anything not listed that would need approval is denied; reads and read-only commands still run.' : 'dontAsk mode, but somebody deleted the allowlist…', allow ? '' : 'warn');
     await sleep(900); if (my !== run) return;
     act(s3);
     const calls = [
@@ -2547,15 +2553,15 @@ function say(el, html, cls = '') { el.className = 'status' + (cls ? ' ' + cls : 
     }
     act(s4);
     $('.res', s4).textContent = allow
-      ? '{ "type": "result", "subtype": "success",\n  "result": "1 bug: proration rounds per line, not per invoice (invoice.ts:88). Test added; 1 failing.",\n  "total_cost_usd": 0.41, "session_id": "…" }\n→ posted as a PR comment'
-      : '{ "type": "result", "subtype": "success",\n  "result": "Code looks correct (tests could not be run).",\n  "total_cost_usd": 0.19, "session_id": "…" }\n→ posted as a PR comment 😬';
+      ? '{ "type": "result", "subtype": "success",\n  "result": "1 bug: proration rounds per line, not per invoice (invoice.ts:88). Test added; 1 failing.",\n  "total_cost_usd": 0.41, "session_id": "…" }\n→ written to the workflow run log (add a comment tool to post it on the PR)'
+      : '{ "type": "result", "subtype": "success",\n  "result": "Code looks correct (tests could not be run).",\n  "total_cost_usd": 0.19, "session_id": "…" }\n→ written to the workflow run log 😬';
     say(st, allow
       ? '<b>Useful review.</b> Claude could read and run exactly the tests it needed; the suspicious <code>curl</code> (maybe from prompt injection in a PR comment) was denied. Least privilege, no prompts.'
       : '<b>Green but worthless.</b> In dontAsk, reads still work, so the job “succeeds” — but tests never ran and the bug slipped through. A CI review is only as good as the tools you allow.', allow ? 'ok' : 'bad');
   }
   $('[data-act=run]', root).onclick = () => enqueue(() => job(true));
   $('[data-act=noallow]', root).onclick = () => enqueue(() => job(false));
-  $('[data-act=reset]', root).onclick = () => { run++; build(true); say(st, 'The job runs in dontAsk mode: pre-approved tools only.'); };
+  $('[data-act=reset]', root).onclick = () => { run++; build(true); say(st, 'The job runs in dontAsk mode: reads plus pre-approved tools only.'); };
   build(true);
   registerFig(root, { first() { enqueue(() => job(true)); } });
 })();
@@ -2575,7 +2581,7 @@ function say(el, html, cls = '') { el.className = 'status' + (cls ? ' ' + cls : 
     let sp = s, co = c, label = p, note = why;
     if (fast.checked) {
       if (opus) { sp = Math.min(100, s * 2.2); co = Math.min(100, c + 25); label += ' · /fast'; note += ' <b>Fast mode:</b> same Opus model, up to ~2.5× faster output, higher cost per token — for when you\'re waiting on it interactively.'; }
-      else note += ' <b>Fast mode</b> is a configuration for Opus, so it doesn\'t change this Sonnet pick.';
+      else note += ' <b>Fast mode</b> only runs on Opus — turning it on switches you from Sonnet to Opus — so it isn\'t part of this Sonnet pick.';
     }
     pick.textContent = label;
     bars.depth.style.width = d + '%'; bars.speed.style.width = sp + '%'; bars.cost.style.width = co + '%';
@@ -2681,9 +2687,9 @@ function say(el, html, cls = '') { el.className = 'status' + (cls ? ' ' + cls : 
     ['You need three independent features built in parallel without sessions overwriting each other\'s files. Use…',
       ['Three subagents in one session', 'Three sessions, each started with claude -w <name> (git worktrees)', 'One session with /loop'], 1,
       'Worktrees give each session its own checkout and branch while sharing history.'],
-    ['What is the biggest everyday cost lever?',
+    ['Token costs scale with context size. Which everyday habit therefore cuts cost reliably?',
       ['Always using the smallest model', 'Context hygiene: /clear between tasks, lean CLAUDE.md, subagents for heavy reading', 'Turning off tool use'], 1,
-      'Every request re-sends the context. Keeping it lean saves more than model switching — then match model and effort to the task.']
+      'Token costs scale with context size, so keeping it lean is the first lever the docs list — then match model and effort to the task.']
   ];
   const box = $('#quiz'); let answered = 0, good = 0; const scoreEl = $('#score');
   function upd() { scoreEl.textContent = `Score: ${good} / ${answered}`; }
